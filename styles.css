@@ -291,3 +291,12 @@ body:not(.tv-mode) .footer{margin-top:10px}
  .rhythm-selector .action{font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.ventilator.squeeze .bag-icon{transform:none}}
+
+
+/* V0.5 PEA Narrow/Wide illustration picker — illustrative ECG waves only */
+.pea-width-buttons .action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:7px 8px;min-height:82px}
+.pea-width-buttons .action span{font-size:12px;font-weight:800}
+.ecg-strip{display:block;width:100%;max-width:220px;height:42px;background:#0b2337;border-radius:6px}
+.ecg-gridline{fill:none;stroke:#30536c;stroke-width:.55}
+.ecg-wave{fill:none;stroke:#6adbc7;stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round}
+.pea-width-buttons .selected .ecg-wave{stroke:#e6ffff}
