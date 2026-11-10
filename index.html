@@ -12,7 +12,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.2</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.3</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -25,6 +25,16 @@
       <p>เปิดไฟล์ <code>config.js</code> ใน GitHub แล้วใส่ Project URL และ Publishable Key ของ Supabase ก่อนทดสอบการซิงก์</p>
     </div>
 
+    <div class="audio-toolbar">
+      <button id="enableSound" class="sound-button" type="button">🔊 เปิดเสียงบน TV / TEST SOUND</button>
+      <span id="audioStatus" class="audio-status">เสียงยังไม่เปิดบนอุปกรณ์นี้</span>
+    </div>
+    <div id="alarmOverlay" class="alarm-overlay" aria-hidden="true">
+      <div class="alarm-content">
+        <span>⚠️ 2-MINUTE CPR CYCLE</span>
+        <strong>RHYTHM CHECK IN <span id="alarmSeconds">10</span> s</strong>
+      </div>
+    </div>
     <div class="roombar">
       <label for="roomInput">ROOM</label>
       <input id="roomInput" maxlength="40" autocomplete="off" spellcheck="false" aria-label="Room code">
@@ -40,14 +50,17 @@
         </div>
         <div class="monitor-main">
           <div class="timer-stack">
-            <div class="subheading">CPR CYCLE COUNTDOWN</div>
-            <div class="clock" data-bind="cycle">02:00</div>
-            <div class="small-display">TOTAL ELAPSED <span data-bind="elapsed">00:00</span></div>
+            <div class="subheading">CPR CYCLE • COUNT UP (2 MIN)</div>
+            <div class="clock" data-bind="cycle">00:00</div>
+            <div class="small-display">TOTAL CASE TIME <span data-bind="elapsed">00:00</span></div>
+            <div class="episode-display">ARREST EPISODE <strong data-bind="episode">0</strong></div>
           </div>
           <div class="stats">
             <div class="stat"><span>SHOCK</span><strong data-bind="shock">0</strong></div>
             <div class="stat"><span>EPINEPHRINE</span><strong data-bind="epi">0</strong></div>
             <div class="stat"><span>RHYTHM</span><strong class="rhythm" data-bind="rhythm">—</strong></div>
+            <div class="stat timer-stat" id="epiStat"><span>EPINEPHRINE TIMER • 4 MIN</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
+            <div class="stat etco2-stat"><span>ETCO₂</span><strong><span data-bind="etco2">—</span> <small>mmHg</small></strong></div>
           </div>
         </div>
         <div class="monitor-foot">
@@ -59,7 +72,7 @@
       <section id="controllerPanel" class="controller" aria-label="CPR controller">
         <div class="section-title"><h2>Controller</h2><span>กดจาก iPhone / iPad แล้ว TV เปลี่ยนตาม</span></div>
         <div class="button-grid">
-          <button data-action="start" class="action start">▶ START CPR</button>
+          <button data-action="start" class="action start" id="startButton">▶ START CPR</button>
           <button data-action="pause" class="action">Ⅱ PAUSE</button>
           <button data-action="resume" class="action">▶ RESUME</button>
           <button data-action="reset" class="action warning">↺ RESET TO STANDBY</button>
@@ -67,6 +80,14 @@
           <button data-action="epi" class="action">💉 EPINEPHRINE +1</button>
           <button data-action="rhythm" data-value="VF/pVT" class="action">VF / pVT</button>
           <button data-action="rhythm" data-value="PEA/Asystole" class="action">PEA / ASYSTOLE</button>
+          <button data-action="rosc" class="action rosc">♥ ROSC</button>
+          <form id="etco2Form" class="etco2-form">
+            <label for="etco2Input">EtCO₂ (mmHg)</label>
+            <div class="etco2-input-row">
+              <input id="etco2Input" type="number" min="0" max="150" step="1" inputmode="numeric" placeholder="35" required>
+              <button id="etco2Submit" type="submit">บันทึก</button>
+            </div>
+          </form>
         </div>
         <div class="link-grid">
           <button id="copyTvLink" class="link-btn">📺 คัดลอกลิงก์สำหรับ TV</button>
@@ -82,7 +103,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V0.2 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V0.3 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
