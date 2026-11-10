@@ -84,7 +84,7 @@ function computeState() {
     } else if (e.type === "resume" && s.phase === "paused") {
       const gap=Math.max(0,t-s.pausedAt);
       s.cycleAnchor+=gap;
-      if (s.epiAnchor!==null) s.epiAnchor+=gap;
+      if (s.epiAnchor!==null) s.epiAnchor+=Math.max(0,t-Math.max(s.pausedAt,s.epiAnchor));
       s.pausedAt=null;
       s.phase="running";
       line(s,e,"RESUME CPR TIMER");
@@ -186,11 +186,12 @@ async function enableSound() {
   if (!tvMode) return;
   audioReady=true;
   const Ctx=window.AudioContext||window.webkitAudioContext;
+  let resumePromise=null;
   try {
     if (Ctx) {
       if (!audioContext) audioContext=new Ctx();
-      // Must be invoked synchronously from the click gesture.
-      await audioContext.resume();
+      // Resume inside click activation, not in a later timer or network callback.
+      resumePromise=audioContext.resume();
     }
   } catch(err){console.warn("Audio unlock",err);}
   const btn=document.getElementById("enableSound");
@@ -199,7 +200,13 @@ async function enableSound() {
   const supported=("speechSynthesis" in window)&&("SpeechSynthesisUtterance" in window);
   document.getElementById("audioStatus").textContent=
     supported?"เปิดเสียงแล้ว — ทดสอบว่ามีเสียงพูดและเสียงบี๊บ":"เปิดเสียงบี๊บแล้ว — Browser นี้อาจไม่รองรับเสียงพูด";
-  soundNotice("เปิดระบบเสียง ซีพีอาร์ ไลฟ์ พร้อมทดสอบ");
+  // Make the first speech call synchronously from the user's click.
+  speak("เปิดระบบเสียง ซีพีอาร์ ไลฟ์ พร้อมทดสอบ");
+  try { if (resumePromise) await resumePromise; } catch(err){console.warn("Audio resume",err);}
+  beep("notice");
+  // If sound is unlocked mid-alarm, allow the active reminder to speak now.
+  nearAlarmKey=cycleEndKey=epiAlarmKey="";
+  render();
 }
 function checkAlarms(s,clock) {
   const overlay=document.getElementById("alarmOverlay");
@@ -208,33 +215,37 @@ function checkAlarms(s,clock) {
   const cycleIndex=Math.floor(cycle/TWO_MIN);
   const inLastTen=ongoing && cycle%TWO_MIN>=TWO_MIN-10000 && cycle%TWO_MIN<TWO_MIN;
   overlay.classList.toggle("alarm-on",!!inLastTen);
+  const announcements=[];
   if (inLastTen) {
     document.getElementById("alarmSeconds").textContent=
       String(Math.ceil((TWO_MIN-cycle%TWO_MIN)/1000));
     const key=room+"|"+s.sessionId+"|"+s.episode+"|"+cycleIndex;
-    if (nearAlarmKey!==key) {
+    if (audioReady && tvMode && nearAlarmKey!==key) {
       nearAlarmKey=key;
-      soundNotice("อีกสิบวินาที ครบรอบซีพีอาร์สองนาที",true);
+      announcements.push("อีกสิบวินาที ครบรอบซีพีอาร์สองนาที");
     }
   }
-  if (ongoing && cycleIndex>=1) {
+  if (ongoing && cycleIndex>=1 && audioReady && tvMode) {
     const key=room+"|"+s.sessionId+"|"+s.episode+"|"+cycleIndex;
     if (cycleEndKey!==key) {
       cycleEndKey=key;
-      // Skip stale 2-minute boundary announcements after a dormant tab resumes.
-      if (cycle%TWO_MIN<3000) soundNotice("ครบสองนาที ตรวจจังหวะตามขั้นตอน",true);
+      // Skip stale boundary announcements if the TV was suspended and resumed.
+      if (cycle%TWO_MIN<3000)announcements.push("ครบสองนาที ตรวจจังหวะตามขั้นตอน");
     }
   }
   const due=ongoing && clock.epiMs>=FOUR_MIN && s.epiAnchor!==null;
   const epiCard=document.getElementById("epiStat");
   epiCard.classList.toggle("due",!!due);
-  if (due) {
+  if (due && audioReady && tvMode) {
     const key=room+"|"+s.sessionId+"|"+s.epiAnchor;
     if (epiAlarmKey!==key) {
       epiAlarmKey=key;
-      soundNotice("ครบสี่นาที นับจากการเริ่มหรือการบันทึกอิพิเนฟรินล่าสุด โปรดตรวจสอบการให้ยา",true);
+      announcements.push("ครบสี่นาที นับจากการเริ่มหรือการบันทึกอิพิเนฟรินล่าสุด โปรดตรวจสอบการให้ยา");
     }
   }
+  // At 04:00, CPR and epinephrine alerts occur together: speak both, not
+  // two interrupted speech utterances.
+  if (announcements.length) soundNotice(announcements.join(" และ "),true);
 }
 function render() {
   const s=computeState();
