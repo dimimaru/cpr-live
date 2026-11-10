@@ -1,77 +1,72 @@
-# CPR Live V0.3 — Realtime CPR screen sync (DEMO ONLY)
+# CPR Live V0.4 — Realtime CPR screen sync (SIMULATION ONLY)
 
-ระบบตัวอย่างสำหรับทดสอบการ Sync หน้าจอ CPR ระหว่าง iPhone/iPad และ TV ผ่าน GitHub Pages + Supabase Realtime Broadcast
+เว็บ Demo สำหรับทดสอบ Sync หน้า iPhone/iPad (Controller) กับ TV (Display) ผ่าน **GitHub Pages + Supabase Realtime Broadcast** ไม่ต้องมี PC Server และไม่สร้างตารางเก็บ CPR
 
-**⚠️ ยังไม่ใช่ซอฟต์แวร์ทางการแพทย์**: ไม่มี Login, การตรวจสอบสิทธิ์, durable storage, server-authoritative clock หรือการรับประกัน delivery. ห้ามใส่ชื่อหรือข้อมูลผู้ป่วย และห้ามใช้เป็นแหล่งข้อมูลหลักในการกู้ชีพจริง
+> **ไม่ใช่อุปกรณ์ช่วยตัดสินใจทางการแพทย์ / ห้ามใช้กับผู้ป่วยจริง**: ไม่มี Login, การตรวจสอบสิทธิ์, ฐานข้อมูล, Audit Trail, การรับประกัน Delivery หรือเวลา Server ที่เป็นแหล่งอ้างอิงเดียว ห้ามใส่ข้อมูลผู้ป่วย การพูดและเสียงอาจไม่ทำงานเมื่อ TV Sleep/Browser Suspend
 
-## เปิดเว็บ
+## ลิงก์
 
 - Controller: https://dimimaru.github.io/cpr-live/?room=ER-DEMO-01
 - TV Display: https://dimimaru.github.io/cpr-live/?view=tv&room=ER-DEMO-01
 
-ใช้ Room Code เดียวกันทุกจอ ให้สถานะเป็น **CONNECTED** ก่อนเริ่มทดสอบ
+ให้เชื่อม ROOM เดียวกันทุกเครื่องจนแสดง CONNECTED
+บน TV กด **🔊 เปิดเสียงบน TV / TEST SOUND** อย่างน้อยหนึ่งครั้งในทุกครั้งที่ Refresh เพื่อปลดล็อก Audio และ TTS ตามข้อจำกัด Browser
 
-## เปิดเสียงบน TV
+## V0.4 features
 
-1. เปิด URL TV Display แล้วรอ CONNECTED
-2. **กดปุ่ม 🔊 เปิดเสียงบน TV / TEST SOUND บนทีวีหนึ่งครั้ง**
-3. ตรวจว่ามีเสียงพูดทดสอบ + เสียงบี๊บ และ TV ไม่ได้ปิดเสียง/ลด Volume
-4. เปิดหน้า Controller บน iPhone/iPad แล้วกด START CPR
-5. TV จะพูดเหตุการณ์ที่บันทึกจากอุปกรณ์ควบคุม
-
-Web Speech API ขึ้นกับ Browser/OS/แพ็กเกจเสียงภาษาไทยของ TV:
-- บาง TV อาจพูดภาษาไทยไม่ได้ แม้ WebSocket จะแสดง CONNECTED
-- Web Audio และ Speech Synthesis ต้องได้รับ user gesture บน TV ตามนโยบาย Autoplay
-- หลัง Refresh หน้า TV อาจต้องกดเปิดเสียงใหม่
-- ถ้า TV Sleep หรือ Browser ถูกพัก การเตือนอาจล่าช้าหรือไม่เล่นเสียง
-
-## ฟังก์ชัน V0.3
-
-| รายการ | รายละเอียด |
+| Feature | Behavior |
 |---|---|
-| CPR Clock | นับขึ้น 00:00 → 01:59 แล้วเริ่มรอบใหม่ทุก 2 นาที |
-| 10-second alert | ช่วง 01:50–01:59 ของทุกรอบ แดงกระพริบเต็มจอพร้อมเสียงเตือน |
-| At 2 min | เสียงแจ้งครบรอบ 2 นาที |
-| Epinephrine Timer | นับขึ้นเริ่มจาก Start CPR (หากยังไม่บันทึกยา) และรีเซ็ตเมื่อกด Epinephrine +1 |
-| 4 min reminder | เมื่อถึง 04:00 มีเสียงเตือนหนึ่งครั้งต่อรอบการจับเวลายา ระหว่าง CPR |
-| EtCO₂ | กรอกเลข 0–150 mmHg แล้วกดบันทึก Sync และพูดตัวเลขบน TV |
-| ROSC | หยุด CPR cycle/alarms, แสดง ROSC แต่ Total Case Time ยังเดินต่อ |
-| Re-arrest | กด Start CPR ซ้ำในสถานะ ROSC เพื่อเริ่มรอบ CPR ใหม่ โดย Total Case Time และจำนวน Shock/Epinephrine เดิมยังอยู่ |
-| Pause / Resume | หยุด/เดินต่อ CPR cycle และ Epinephrine timer ชั่วคราว แต่ Total Case Time ยังเดิน |
-| TV Voice | TV พูดทุก event ใหม่ที่เข้ามา ไม่อ่าน Timeline เก่าซ้ำเมื่อ reconnect |
+| CPR CYCLE TIMER | **นับถอยหลัง** 02:00 → 00:01 → 02:00 รอบละ 2 นาที |
+| Warning | ตั้งแต่เหลือ 00:10 จอแดงกระพริบเต็มจอ พร้อมเสียงพูดเตือนหนึ่งครั้ง และพูดเมื่อครบรอบ |
+| TOTAL CASE TIME | **นับขึ้น** ต่อเนื่องจาก Start ครั้งแรก; ไม่หยุดขณะ ROSC |
+| EPINEPHRINE TIMER | **นับขึ้น** จาก Start CPR หากยังไม่เคยบันทึกยา / Reset เมื่อกด Epinephrine; เตือนเมื่อครบ 04:00 (Demo Reminder) |
+| Rhythm | VF/pVT และ PEA/Asystole; ตัวอักษร Rhythm บน TV ไม่ตัดเป็นหลายบรรทัด |
+| Epinephrine emphasis | VF/pVT ก่อน Shock #2 ปุ่มไม่เด่น, หลัง Shock #2 เด่น; PEA/Asystole เด่นทันที; ยังสามารถบันทึกยาที่ให้จริงด้วยตนเอง |
+| Amiodarone | ปุ่มแรก 300 mg; หลังบันทึกเปลี่ยนเป็น 150 mg; ทุกการกดเป็นการบันทึก ไม่ใช่ Auto Administer |
+| Shock #2 | TV พูดให้ **เตรียม** Amiodarone 300 mg สำหรับหลัง Shock #3 |
+| Shock #3 | แสดงปุ่ม 300 mg เด่น และพูดพิจารณาการให้หากยัง VF/pVT |
+| Shock #4 | แสดงปุ่ม 150 mg สำหรับ **เตรียม** (สีอำพัน) ไม่สั่งให้ยาอัตโนมัติ; หากบันทึกยาที่ให้จริงก่อน Shock #5 จะมีหน้าต่างยืนยัน |
+| Shock #5 | เน้นปุ่ม Amiodarone 150 mg ขนาดที่สอง (ตาม ERC 2025) |
+| TV metronome | จังหวะ **105 beats/minute**, เปิดอัตโนมัติหลังปลดล็อก Audio ขณะ CPR Active; มีปุ่มเปิด/ปิดแยกจากเสียงพูด |
+| Spoken feedback | TV พูด Start, Shock, Epinephrine, Amiodarone, Rhythm, EtCO₂, ROSC, Pause, Resume, Reset, CPR 2-minute alarm และยา 4-minute alert |
+| ROSC | หยุด CPR cycle/metronome/alarm แต่ TOTAL CASE TIME ยังนับต่อ |
+| Re-arrest | Start CPR ซ้ำแล้ว Reset รอบ CPR โดยคง TOTAL CASE TIME และ Timeline |
+| EtCO₂ | บันทึกตัวเลข 0–150 mmHg และกระจายไปทุกจอ |
 
-### ตรรกะเวลา
+### ความแตกต่างของ Guideline ที่ควรทราบ
 
-- TOTAL CASE TIME = เวลาจริงจาก Start CPR ครั้งแรก (รวมช่วง ROSC)
-- CPR CYCLE = รอบ CPR ของ episode ปัจจุบัน นับขึ้นและรีเซ็ตรอบทุก 2 นาที
-- EPINEPHRINE TIMER = ตั้งแต่ Start หรือการบันทึกยาล่าสุด; หยุดระหว่าง Pause; เดินต่อระหว่าง ROSC โดยไม่มี Alarm; เมื่อ Re-arrest ถ้าเคยบันทึกยาแล้วจะยังอิงยาครั้งล่าสุด
-- RESET = ล้าง session จากหน้าจอที่ยังออนไลน์และกลับ Standby
+**แนวทางที่ใช้ใน Demo:** AHA ACLS 2025 เพื่อเน้น Epinephrine หลังการช็อกสองครั้งใน VF/pVT; ให้เร็วใน PEA/Asystole และเตือนทุก 4 นาที (ช่วงมาตรฐาน 3–5 นาที) ส่วน Amiodarone 300 mg หลัง Shock #3, ขนาดสอง 150 mg แนวทาง ERC 2025 ระบุหลัง Shock #5
 
-**4 นาทีเป็น Reminder สำหรับ Demo ไม่ใช่คำสั่งให้ยาอัตโนมัติ** แนวทาง AHA 2025 Adult Cardiac Arrest ระบุ epinephrine ทุก 3–5 นาที และกำหนดจังหวะการรักษาตาม Rhythm
-https://professional.heart.org/-/media/CPR-Files/CPR-Guidelines-Files/2025-Algorithms/Algorithm-ACLS-CA-250527.pdf
+AHA 2025 ให้ยา Epinephrine เมื่อการช็อกระยะแรกไม่สำเร็จ ขณะที่ ERC 2025 ระบุ Epinephrine เริ่มหลัง Shock #3 ใน shockable rhythm; โรงพยาบาลต้องเลือกและยืนยัน protocol ก่อนใช้งานจริง
 
-## ตั้งค่าครั้งแรก (ถ้าทำแล้วไม่ต้องทำซ้ำ)
+- AHA 2025 Adult ALS: https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines/adult-advanced-life-support
+- AHA High Quality CPR (100–120/min): https://cpr.heart.org/en/resuscitation-science/high-quality-cpr
+- ERC Adult ALS 2025: https://www.resus.org.uk/cy/node/36438
 
-1. Supabase Project: Realtime > Settings > Enable Realtime = ON
-2. Allow public access to channels = ON (เฉพาะ Demo)
-3. GitHub Pages: Branch main, Folder /(root)
-4. config.js: ใส่ Project URL และ publishable key เท่านั้น
-5. ห้ามใส่ service_role, secret key, database password หรือข้อมูลผู้ป่วยลง GitHub
+## Acceptance checklist
 
-## ทดสอบ V0.3
+- [ ] TV CONNECTED และเสียงทดสอบทำงานหลังคลิก Enable TV Sound
+- [ ] กด Start บน iPhone, TV พูด Start และ CPR TIMER นับถอยหลัง
+- [ ] 01:50 elapsed = 00:10 left: หน้าจอแดงและพูดเตือน
+- [ ] เวลา Epi นับ **ขึ้น** และเตือนเมื่อผ่าน 04:00 หลังเริ่มหรือให้ยาครั้งล่าสุด
+- [ ] Rhythm PEA/Asystole แสดงเต็มบรรทัดบน TV
+- [ ] Shock #1: VF/pVT Epinephrine ยังไม่เด่น
+- [ ] Shock #2: VF/pVT Epinephrine เด่น + TV พูดเตรียม Amiodarone 300 mg
+- [ ] Shock #3: Amiodarone 300 mg เด่น; กดแล้วเปลี่ยนปุ่มเป็น 150 mg
+- [ ] Shock #4: ปุ่ม 150 mg สีอำพันสำหรับเตรียม; หากกดบันทึกก่อน #5 มีคำเตือน
+- [ ] Shock #5: ปุ่ม 150 mg เด่น; กดบันทึกแล้ว TV พูดขนาดยา
+- [ ] Rhythm PEA/Asystole: Epinephrine เด่นทันที
+- [ ] ขณะ CPR active มีจังหวะ 105 BPM บน TV (Toggle ได้)
+- [ ] ROSC หยุด Metronome และ CPR Alarm แต่ TOTAL CASE TIME เดินต่อ
+- [ ] Re-arrest เริ่มรอบ CPR ใหม่แต่ TOTAL CASE TIME/Timeline เดิมยังอยู่
 
-- [ ] TV Connected และกดเปิดเสียงบน TV แล้วมีเสียงทดสอบ
-- [ ] กด Start จากมือถือ: ทุกจอเห็นการนับขึ้น และ TV พูด Start
-- [ ] กด Shock, Epinephrine, Rhythm, EtCO₂: TV พูดทันที ทุกจอเปลี่ยนตาม
-- [ ] CPR 01:50: ทุกจอเตือนแดง 10 วินาที และ TV พูดเตือน
-- [ ] CPR 02:00: TV พูดครบรอบ, CPR cycle เริ่มนับใหม่
-- [ ] Epinephrine 04:00: TV พูดเตือนหนึ่งครั้ง; กด Epinephrine แล้วกลับ 00:00
-- [ ] ROSC: Total Case Time ยังนับ; CPR cycle/alert หยุด
-- [ ] Re-arrest / Start CPR: CPR cycle เริ่ม 00:00 แต่ Total Case Time และเหตุการณ์เก่ายังอยู่
-- [ ] Refresh TV และกดเปิดเสียงใหม่: แสดงข้อมูลตรง Controller โดยไม่อ่าน Timeline เดิมซ้ำ
+## Known limitations
 
-## ข้อจำกัด
+- Public Channel สามารถถูกส่งคำสั่งจำลองจากผู้ที่ทราบ URL/Room Code ได้ ไม่ปลอดภัยต่อข้อมูลจริง
+- ตัวจับเวลาใช้ Date.now ของแต่ละอุปกรณ์ ไม่มี authoritative server clock หรือ event durability
+- TTS ภาษาไทยขึ้นกับ TV / Browser / voice package; บาง TV ได้เสียง beep แต่ไม่มี Thai voice
+- Browser อาจระงับ Timer/Audio เมื่อเปิดค้างเป็นเวลานานหรือเมื่อ Screen Sleep
+- ไม่มีเสียงเตือนหรือบทพูดใดที่รับประกันการเล่นทันเวลา
+- การแจ้งเตือนยาเป็นเพียงตัวช่วยทดสอบการนำเสนอ ไม่ใช่คำสั่งรักษา
 
-Supabase Public Channel ใช้ทดสอบเท่านั้น: ใครทราบ Room Code และค่า Public ของ Project อาจส่งข้อความจำลองได้; เมื่อทุกจอปิดพร้อมกันข้อมูลจะหาย. ไม่มีการรับประกัน Event Delivery, ไม่มี audit trail, ไม่มีการเทียบเวลา Server อย่างเข้มงวด และไม่เหมาะสำหรับการใช้งานกับผู้ป่วยจริง.
-
-Files: index.html, styles.css, app.js, config.js
+ไฟล์หลัก: index.html, styles.css, app.js, config.js
