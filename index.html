@@ -99,8 +99,20 @@
         <div id="peaWidthPicker" class="pea-width-picker" hidden>
           <strong>PEA QRS COMPLEX — เลือกความกว้าง</strong>
           <div class="pea-width-buttons">
-            <button data-action="peaWidth" data-value="Narrow" class="action">NARROW QRS</button>
-            <button data-action="peaWidth" data-value="Wide" class="action">WIDE QRS</button>
+            <button data-action="peaWidth" data-value="Narrow" class="action" aria-label="เลือก PEA Narrow QRS">
+              <svg class="ecg-strip" viewBox="0 0 200 50" aria-hidden="true">
+                <path class="ecg-gridline" d="M0 25 H200 M40 0 V50 M80 0 V50 M120 0 V50 M160 0 V50"/>
+                <path class="ecg-wave" d="M2 28 H30 Q36 20 42 28 H61 L69 27 L74 7 L80 43 L86 28 H120 Q126 21 132 28 H147 L155 27 L160 7 L166 43 L172 28 H198"/>
+              </svg>
+              <span>NARROW QRS</span>
+            </button>
+            <button data-action="peaWidth" data-value="Wide" class="action" aria-label="เลือก PEA Wide QRS">
+              <svg class="ecg-strip" viewBox="0 0 200 50" aria-hidden="true">
+                <path class="ecg-gridline" d="M0 25 H200 M40 0 V50 M80 0 V50 M120 0 V50 M160 0 V50"/>
+                <path class="ecg-wave" d="M2 29 H24 Q30 20 37 29 H53 C60 26 65 8 80 8 C93 8 99 41 113 42 Q126 42 134 28 H154 C162 27 169 8 182 9 L198 28"/>
+              </svg>
+              <span>WIDE QRS</span>
+            </button>
           </div>
           <p>พิจารณา POCUS หาสาเหตุที่แก้ไขได้ โดยไม่ทำให้การกดหน้าอกหยุดชะงัก</p>
         </div>
