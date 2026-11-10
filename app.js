@@ -22,7 +22,7 @@ let switchingRoom = false;
 
 // Audio is deliberately TV-only. Browsers require a gesture on each TV page
 // before sound and Web Speech are reliably permitted.
-let audioReady = false;
+let audioReady = tvMode; // Attempt speech automatically; WebAudio may still be blocked.
 let audioContext = null;
 let nearAlarmKey = "";
 let cycleEndKey = "";
@@ -284,31 +284,28 @@ function medicationCue(s){
   else cue="VF/pVT — ให้ CPR ต่อเนื่อง ประเมิน Rhythm และยา ตาม ACLS";
   return {epiReady,cue,shockable,amioCount};
 }
-async function enableSound() {
-  if (!tvMode) return;
-  audioReady=true;
+function updateAudioStatus(message,blocked=false) {
+  const el=document.getElementById("audioStatus");
+  el.textContent=message;
+  el.classList.toggle("blocked",blocked);
+}
+function initTVAudio() {
+  if(!tvMode)return;
   const Ctx=window.AudioContext||window.webkitAudioContext;
-  let resumePromise=null;
+  if(!Ctx){
+    updateAudioStatus("TV AUDIO: Web Audio unavailable • speech depends on browser",true);
+    return;
+  }
   try {
-    if (Ctx) {
-      if (!audioContext) audioContext=new Ctx();
-      // Resume inside click activation, not in a later timer or network callback.
-      resumePromise=audioContext.resume();
-    }
-  } catch(err){console.warn("Audio unlock",err);}
-  const btn=document.getElementById("enableSound");
-  btn.classList.add("enabled");
-  btn.textContent="🔊 เสียง TV เปิดแล้ว · ทดสอบอีกครั้ง";
-  const supported=("speechSynthesis" in window)&&("SpeechSynthesisUtterance" in window);
-  document.getElementById("audioStatus").textContent=
-    supported?"เปิดเสียงแล้ว — ทดสอบว่ามีเสียงพูดและเสียงบี๊บ":"เปิดเสียงบี๊บแล้ว — Browser นี้อาจไม่รองรับเสียงพูด";
-  // Make the first speech call synchronously from the user's click.
-  speak("เปิดระบบเสียง ซีพีอาร์ ไลฟ์ พร้อมทดสอบ");
-  try { if (resumePromise) await resumePromise; } catch(err){console.warn("Audio resume",err);}
-  beep("notice");
-  // If sound is unlocked mid-alarm, allow the active reminder to speak now.
-  nearAlarmKey=cycleEndKey=epiAlarmKey="";
-  render();
+    if(!audioContext)audioContext=new Ctx();
+    const p=audioContext.resume();
+    if(p && typeof p.then==="function")p.then(()=>{
+      const ready=audioContext && audioContext.state==="running";
+      updateAudioStatus(ready?"TV AUDIO ENGINE READY":"TV AUDIO MAY BE BLOCKED BY BROWSER",!ready);
+      render();
+    }).catch(()=>updateAudioStatus("TV AUDIO BLOCKED — browser requires local user gesture",true));
+    else updateAudioStatus(audioContext.state==="running"?"TV AUDIO ENGINE READY":"TV AUDIO MAY BE BLOCKED",audioContext.state!=="running");
+  } catch(err){console.warn("Autoplay restrictions",err);updateAudioStatus("TV AUDIO BLOCKED / UNSUPPORTED",true);}
 }
 function checkAlarms(s,clock) {
   const overlay=document.getElementById("alarmOverlay");
@@ -349,6 +346,34 @@ function checkAlarms(s,clock) {
   // two interrupted speech utterances.
   if (announcements.length) soundNotice(announcements.join(" และ "),true);
 }
+function renderVentilation(s,clock) {
+  const show=s.advancedAirway && ["running","paused"].includes(s.phase);
+  const tv=document.getElementById("ventilator");
+  const mobile=document.getElementById("controllerVent");
+  tv.hidden=mobile.hidden=!show;
+  if(!show)return;
+  const remaining=Math.max(1,Math.ceil((6000-clock.ventMs%6000)/1000));
+  const squeeze=s.phase==="running" && remaining===1;
+  document.querySelectorAll('[data-bind="ventTime"]').forEach(el=>{el.textContent=String(remaining);});
+  tv.classList.toggle("squeeze",squeeze);
+  mobile.classList.toggle("squeeze",squeeze);
+  document.getElementById("ventLabel").textContent=squeeze?"SQUEEZE BAG • 1 SECOND":s.phase==="paused"?"CPR PAUSED":"NEXT BREATH IN";
+  document.getElementById("controllerVentLabel").textContent=squeeze?"🟢 SQUEEZE BAG":"NEXT BREATH";
+}
+function renderAirwayAndRhythm(s) {
+  const active=["running","paused"].includes(s.phase);
+  document.getElementById("etTubeBtn").hidden=s.advancedAirway;
+  document.getElementById("etco2Form").hidden=!s.advancedAirway;
+  document.getElementById("peaWidthPicker").hidden=!(active && s.rhythm==="PEA");
+  document.getElementById("rhythmWarning").hidden=!(active && s.rhythm==="—");
+  document.querySelectorAll(".rhythm-button").forEach(btn=>
+    btn.classList.toggle("selected",active && btn.dataset.value===s.rhythm));
+  document.querySelectorAll(".pea-width-buttons button").forEach(btn=>
+    btn.classList.toggle("selected",btn.dataset.value===s.peaWidth));
+  const low=s.advancedAirway && s.etco2!==null && s.etco2<10 && active;
+  document.getElementById("co2Warning").hidden=!low;
+  document.getElementById("co2Stat").classList.toggle("low-co2",low);
+}
 function render() {
   const s=computeState();
   const clock=elapsedFor(s,Date.now());
@@ -365,7 +390,7 @@ function render() {
       s.phase==="rosc"?"ROSC • ไม่แจ้งเตือนยา":
       s.phase==="paused"?"PAUSED":clock.epiMs>=FOUR_MIN?"ครบ 4 นาที — ตรวจสอบ Protocol":
       "เป้าหมายแจ้งเตือนที่ 04:00",
-    shock:s.shock,epi:s.epi,rhythm:s.rhythm,etco2:s.etco2===null?"—":s.etco2,
+    shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm,etco2:s.etco2===null?"—":s.etco2,
     episode:s.episode,room
   };
   for (const [key,val] of Object.entries(values)) {
@@ -405,8 +430,18 @@ function render() {
       (action==="resume" && s.phase!=="paused") ||
       (action==="reset" && s.phase==="standby") ||
       (action==="rosc" && !active) ||
-      (["shock","epi","rhythm"].includes(action) && !active);
+      (["shock","epi","rhythm"].includes(action) && !active) ||
+      (action==="peaWidth" && (!active || s.rhythm!=="PEA")) ||
+      (action==="etTube" && (!active || s.advancedAirway));
   }
+  const pauseResume=document.getElementById("pauseResumeBtn");
+  const resume=s.phase==="paused";
+  pauseResume.dataset.action=resume?"resume":"pause";
+  pauseResume.textContent=resume?"▶ RESUME":"Ⅱ PAUSE";
+  const metro=document.getElementById("toggleMetronome");
+  metro.classList.toggle("active",s.metronomeOn);
+  metro.setAttribute("aria-pressed",String(s.metronomeOn));
+  metro.textContent="🎵 105 BPM "+(s.metronomeOn?"ON":"OFF");
   const epiButton=document.getElementById("epiButton");
   epiButton.classList.toggle("epi-highlight",cue.epiReady);
   epiButton.classList.toggle("epi-muted",!cue.epiReady);
@@ -427,7 +462,7 @@ function render() {
     " • ปุ่ม Amiodarone บันทึกการให้ยาจริง ไม่ได้สั่งให้ยาอัตโนมัติ";
   const entry=document.getElementById("etco2Input");
   const submit=document.getElementById("etco2Submit");
-  entry.disabled=!connected || s.phase==="standby";
+  entry.disabled=!connected || !s.advancedAirway || s.phase==="standby";
   submit.disabled=entry.disabled;
   const startButton=document.getElementById("startButton");
   startButton.textContent=s.phase==="rosc"?"▶ RE-ARREST / START CPR":"▶ START CPR";
@@ -436,6 +471,8 @@ function render() {
     s.phase==="standby"?"ONLINE — รอ Start CPR จาก Controller":
     s.phase==="rosc"?"ONLINE — ROSC • TOTAL CASE TIME STILL RUNNING":
     s.phase==="paused"?"ONLINE — CPR TIMER PAUSED":"ONLINE — REALTIME CPR SESSION";
+  renderAirwayAndRhythm(s);
+  renderVentilation(s,clock);
   checkAlarms(s,clock);
   updateMetronome(s);
 }
