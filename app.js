@@ -488,7 +488,9 @@ function validEvent(obj) {
     obj.id.length>110 || !ACTIONS.has(obj.type) ||
     !Number.isFinite(obj.ts) || Math.abs(Date.now()-obj.ts)>86400000 ||
     !Number.isSafeInteger(obj.seq) || obj.seq<1 || messages.has(obj.id)) return false;
-  if (obj.type==="rhythm" && !["VF/pVT","PEA/Asystole"].includes(obj.value)) return false;
+  if (obj.type==="rhythm" && !["VF","VT","PEA","Asystole"].includes(obj.value))return false;
+  if (obj.type==="peaWidth" && !["Narrow","Wide"].includes(obj.value))return false;
+  if (obj.type==="metro" && typeof obj.value!=="boolean")return false;
   if (obj.type==="amio" && obj.value!==300 && obj.value!==150)return false;
   if (obj.type==="etco2" && (!Number.isInteger(obj.value)||obj.value<0||obj.value>150)) return false;
   return true;
@@ -523,10 +525,13 @@ async function handleAction(type,value) {
   if (type==="resume" && s.phase!=="paused")return;
   if (type==="rosc" && !["running","paused"].includes(s.phase))return;
   if (type==="reset" && s.phase==="standby")return;
-  if (["shock","epi","rhythm"].includes(type) && !["running","paused"].includes(s.phase))return;
-  if (type==="etco2" && s.phase==="standby")return;
+  if (["shock","epi","rhythm","peaWidth","etTube"].includes(type) && !["running","paused"].includes(s.phase))return;
+  if (type==="peaWidth" && s.rhythm!=="PEA")return;
+  if (type==="etTube" && s.advancedAirway)return;
+  if (type==="metro")value=!s.metronomeOn;
+  if (type==="etco2" && (!s.advancedAirway || s.phase==="standby"))return;
   if(type==="amio"){
-    if(s.rhythm!=="VF/pVT" || !["running","paused"].includes(s.phase) ||
+    if(!["VF","VT"].includes(s.rhythm) || !["running","paused"].includes(s.phase) ||
       s.amioDoses.length>=2)return;
     const next=s.amioDoses.length===0?300:150;
     if(s.shock<(next===300?3:4))return;
@@ -608,16 +613,15 @@ async function copyLink(view) {
     prompt("คัดลอกลิงก์นี้",url);
   }
 }
-document.getElementById("enableSound").addEventListener("click",enableSound);
-document.getElementById("toggleMetronome").addEventListener("click",()=>{
-  metronomeEnabled=!metronomeEnabled;
-  const button=document.getElementById("toggleMetronome");
-  button.classList.toggle("active",metronomeEnabled);
-  button.setAttribute("aria-pressed",String(metronomeEnabled));
-  button.textContent="🎵 METRONOME 105 BPM: "+(metronomeEnabled?"ON":"OFF");
-  nextMetronomeBeat=null;
-  render();
-});
+// On TV, no test button or manual setup step. Browser may still block autoplay.
+if(tvMode){
+  initTVAudio();
+  document.addEventListener("pointerdown",initTVAudio,{passive:true});
+  document.addEventListener("keydown",initTVAudio);
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden)initTVAudio();
+  });
+}
 document.getElementById("joinRoomBtn").addEventListener("click",()=>enterRoom(document.getElementById("roomInput").value));
 document.getElementById("roomInput").addEventListener("keydown",e=>{
   if (e.key==="Enter")enterRoom(e.currentTarget.value);
@@ -625,7 +629,13 @@ document.getElementById("roomInput").addEventListener("keydown",e=>{
 document.getElementById("copyTvLink").addEventListener("click",()=>copyLink("tv"));
 document.getElementById("copyControlLink").addEventListener("click",()=>copyLink("controller"));
 document.querySelectorAll("[data-action]").forEach(btn=>
-  btn.addEventListener("click",()=>handleAction(btn.dataset.action,btn.dataset.value))
+  btn.addEventListener("click",()=>{
+    const action=btn.dataset.action;
+    if(action==="reset" && !confirm("ยืนยัน RESET? จะลบเวลา CPR, จำนวนยา และเหตุการณ์ทั้งหมดในห้องปัจจุบัน"))return;
+    if(action==="pause" && !confirm("ยืนยัน PAUSE CPR TIMER?"))return;
+    if(action==="resume" && !confirm("ยืนยัน RESUME CPR TIMER?"))return;
+    handleAction(action,btn.dataset.value);
+  })
 );
 document.getElementById("etco2Form").addEventListener("submit",e=>{
   e.preventDefault();
@@ -638,7 +648,8 @@ document.getElementById("etco2Form").addEventListener("submit",e=>{
   }
 });
 window.addEventListener("online",()=>{
-  if (supabase && connected)requestSync();
+  if(supabase && connected)requestSync();
+  if(tvMode)initTVAudio();
 });
 setInterval(render,250);
 render();
