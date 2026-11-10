@@ -128,3 +128,47 @@ body.tv-mode .monitor-main{gap:20px}
  body.tv-mode .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
  body.tv-mode .timer-stat strong{font-size:38px}
 }
+
+/* V0.4: rhythm never wraps and TV metric grid allocates a wider rhythm cell. */
+.stat.rhythm-stat{grid-column:auto;min-width:0}
+.stat.rhythm-stat .rhythm{white-space:nowrap;display:block;line-height:1.1;font-size:clamp(15px,1.8vw,28px);overflow:hidden;text-overflow:clip;letter-spacing:-.02em}
+.clinical-cue{font-size:clamp(12px,1.15vw,18px);background:#1c314b;padding:13px 24px;color:#cde2f8;font-weight:700;border-top:1px solid #2f4865;line-height:1.45}
+.drug-hint{font-size:13px;border-left:3px solid #4da4da;color:#c4def3;padding:10px 13px;background:#1b324b;border-radius:8px;line-height:1.5}
+.action.medication{transition:background .2s,border-color .2s,box-shadow .2s}
+.action.epi-muted{background:#293a50;border-color:#415772;color:#a4b2c6;box-shadow:none}
+.action.epi-highlight{background:#0c825e;border:2px solid #4cffba;color:#fff;box-shadow:0 0 0 2px #0f6c4e55}
+.action.amio-muted{background:#263449;border-color:#475c78;color:#b1bacb;box-shadow:none}
+.action.amio-prepare{background:#6a4c24;border:2px solid #ffc774;color:#fff}
+.action.amio-highlight{background:#7d3aa0;border:2px solid #d89bff;color:#fff;box-shadow:0 0 16px #b64fe233}
+.metronome-button{border-radius:11px;background:#53364b;color:#ffe5e9;font-size:12px;border:1px solid #ab687f;font-weight:800;padding:12px 15px}
+.metronome-button.active{background:#163957;color:#d0f1ff;border-color:#459bc7}
+body.tv-mode .monitor-main{grid-template-columns:minmax(0,1fr) minmax(0,1.28fr);min-height:50vh;gap:12px;padding:22px}
+body.tv-mode .stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;min-width:0}
+body.tv-mode .stats>.stat{min-width:0;padding:11px}
+body.tv-mode .stats>.stat:nth-child(1),body.tv-mode .stats>.stat:nth-child(2){grid-column:span 1}
+body.tv-mode .stats>.stat.rhythm-stat{grid-column:span 2}
+body.tv-mode .stats>.stat.timer-stat{grid-column:span 3}
+body.tv-mode .stats>.stat.etco2-stat{grid-column:span 1}
+body.tv-mode .stat.rhythm-stat .rhythm{font-size:clamp(15px,2vw,33px);letter-spacing:-.045em}
+body.tv-mode .stats>.stat:nth-child(1) strong,body.tv-mode .stats>.stat:nth-child(2) strong{font-size:clamp(38px,4vw,80px)}
+body.tv-mode .stats>.stat.etco2-stat strong{font-size:clamp(30px,3vw,66px)}
+body.tv-mode .stats>.stat.etco2-stat strong small{font-size:clamp(9px,1vw,13px)}
+@media(max-width:900px){
+ .clinical-cue{font-size:12px;padding:12px 15px}
+ body.tv-mode .monitor-main{grid-template-columns:1fr;min-height:0;gap:8px}
+ body.tv-mode .stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+ body.tv-mode .stats>.stat.rhythm-stat{grid-column:span 2}
+ body.tv-mode .stat.rhythm-stat .rhythm{font-size:clamp(15px,3.2vw,26px)}
+ body.tv-mode .clock{font-size:clamp(85px,17vw,160px)}
+ .stat.rhythm-stat{grid-column:span 3}
+ .stat.rhythm-stat .rhythm{font-size:clamp(18px,4vw,28px)}
+}
+@media(max-width:500px){
+ .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .stats>.stat.rhythm-stat{grid-column:span 3}
+ .stats>.stat.timer-stat{grid-column:span 2}
+ .stats>.stat.etco2-stat{grid-column:span 1}
+ .stat.rhythm-stat .rhythm{font-size:clamp(19px,5vw,28px)}
+ .audio-toolbar{gap:7px}
+ .metronome-button,.sound-button{font-size:11px;padding:9px}
+}
