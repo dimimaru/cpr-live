@@ -12,7 +12,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.3</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.4</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -27,6 +27,7 @@
 
     <div class="audio-toolbar">
       <button id="enableSound" class="sound-button" type="button">🔊 เปิดเสียงบน TV / TEST SOUND</button>
+      <button id="toggleMetronome" class="metronome-button active" type="button" aria-pressed="true">🎵 METRONOME 105 BPM: ON</button>
       <span id="audioStatus" class="audio-status">เสียงยังไม่เปิดบนอุปกรณ์นี้</span>
     </div>
     <div id="alarmOverlay" class="alarm-overlay" aria-hidden="true">
@@ -50,19 +51,20 @@
         </div>
         <div class="monitor-main">
           <div class="timer-stack">
-            <div class="subheading">CPR CYCLE • COUNT UP (2 MIN)</div>
-            <div class="clock" data-bind="cycle">00:00</div>
+            <div class="subheading">CPR CYCLE • COUNTDOWN (2 MIN)</div>
+            <div class="clock" data-bind="cycle">02:00</div>
             <div class="small-display">TOTAL CASE TIME <span data-bind="elapsed">00:00</span></div>
             <div class="episode-display">ARREST EPISODE <strong data-bind="episode">0</strong></div>
           </div>
           <div class="stats">
             <div class="stat"><span>SHOCK</span><strong data-bind="shock">0</strong></div>
             <div class="stat"><span>EPINEPHRINE</span><strong data-bind="epi">0</strong></div>
-            <div class="stat"><span>RHYTHM</span><strong class="rhythm" data-bind="rhythm">—</strong></div>
+            <div class="stat rhythm-stat"><span>RHYTHM</span><strong class="rhythm" data-bind="rhythm">—</strong></div>
             <div class="stat timer-stat" id="epiStat"><span>EPINEPHRINE TIMER • 4 MIN</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
             <div class="stat etco2-stat"><span>ETCO₂</span><strong><span data-bind="etco2">—</span> <small>mmHg</small></strong></div>
           </div>
         </div>
+        <div class="clinical-cue" id="clinicalCue" aria-live="off">เลือก Rhythm เพื่อแสดงข้อความเตือนตามแนวทาง Adult ACLS 2025 (Demo)</div>
         <div class="monitor-foot">
           <span id="connectionHint">เปิดหน้าเว็บค้างไว้เพื่อรอการเชื่อมต่อ</span>
           <span>SIMULATION ONLY · NO PATIENT DATA</span>
@@ -77,7 +79,8 @@
           <button data-action="resume" class="action">▶ RESUME</button>
           <button data-action="reset" class="action warning">↺ RESET TO STANDBY</button>
           <button data-action="shock" class="action shock">⚡ SHOCK +1</button>
-          <button data-action="epi" class="action">💉 EPINEPHRINE +1</button>
+          <button data-action="epi" class="action medication epi-muted" id="epiButton">💉 EPINEPHRINE +1</button>
+          <button data-action="amio" class="action medication amio-muted" id="amioButton">💊 AMIODARONE 300 mg</button>
           <button data-action="rhythm" data-value="VF/pVT" class="action">VF / pVT</button>
           <button data-action="rhythm" data-value="PEA/Asystole" class="action">PEA / ASYSTOLE</button>
           <button data-action="rosc" class="action rosc">♥ ROSC</button>
@@ -89,6 +92,7 @@
             </div>
           </form>
         </div>
+        <p id="drugHint" class="drug-hint">เลือก Rhythm ก่อนเพื่อแสดงคำแนะนำยา • ผู้ใช้บันทึกยาที่ให้จริงเท่านั้น</p>
         <div class="link-grid">
           <button id="copyTvLink" class="link-btn">📺 คัดลอกลิงก์สำหรับ TV</button>
           <button id="copyControlLink" class="link-btn">📱 คัดลอกลิงก์ Controller</button>
@@ -103,7 +107,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V0.3 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V0.4 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
