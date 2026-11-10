@@ -12,7 +12,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.4</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.5</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -25,11 +25,7 @@
       <p>เปิดไฟล์ <code>config.js</code> ใน GitHub แล้วใส่ Project URL และ Publishable Key ของ Supabase ก่อนทดสอบการซิงก์</p>
     </div>
 
-    <div class="audio-toolbar">
-      <button id="enableSound" class="sound-button" type="button">🔊 เปิดเสียงบน TV / TEST SOUND</button>
-      <button id="toggleMetronome" class="metronome-button active" type="button" aria-pressed="true">🎵 METRONOME 105 BPM: ON</button>
-      <span id="audioStatus" class="audio-status">เสียงยังไม่เปิดบนอุปกรณ์นี้</span>
-    </div>
+    <div class="audio-health" id="audioStatus" aria-live="off"></div>
     <div id="alarmOverlay" class="alarm-overlay" aria-hidden="true">
       <div class="alarm-content">
         <span>⚠️ 2-MINUTE CPR CYCLE</span>
@@ -61,7 +57,26 @@
             <div class="stat"><span>EPINEPHRINE</span><strong data-bind="epi">0</strong></div>
             <div class="stat rhythm-stat"><span>RHYTHM</span><strong class="rhythm" data-bind="rhythm">—</strong></div>
             <div class="stat timer-stat" id="epiStat"><span>EPINEPHRINE TIMER • 4 MIN</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
-            <div class="stat etco2-stat"><span>ETCO₂</span><strong><span data-bind="etco2">—</span> <small>mmHg</small></strong></div>
+            <div class="stat etco2-stat" id="co2Stat">
+              <span>EtCO₂</span>
+              <div class="co2-value"><strong data-bind="etco2">—</strong><small>mmHg</small></div>
+              <div class="co2-warning" id="co2Warning" hidden>⚠️ CO₂ &lt; 10 — CHECK HIGH-QUALITY CPR</div>
+            </div>
+          </div>
+        </div>
+        <div class="ventilator" id="ventilator" hidden>
+          <div class="vent-title">VENTILATION AFTER ET TUBE · EVERY 6 SECONDS · NO AUDIO</div>
+          <div class="vent-visual">
+            <span class="bag-icon" id="bagIcon" aria-hidden="true">
+              <svg viewBox="0 0 110 92" role="img" aria-label="Bag valve mask">
+                <rect x="6" y="35" width="16" height="22" rx="3" fill="currentColor" opacity=".7"/>
+                <path d="M22 46 L34 46" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+                <path d="M35 24 Q24 47 35 69 Q57 85 78 69 Q90 46 78 24 Q57 8 35 24Z" fill="currentColor" stroke="#d8fff0" stroke-width="3"/>
+                <path d="M79 46 L97 46" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+                <rect x="96" y="34" width="11" height="24" rx="4" fill="currentColor"/>
+              </svg>
+            </span>
+            <div class="vent-time"><strong data-bind="ventTime">6</strong><span id="ventLabel">NEXT BREATH IN</span></div>
           </div>
         </div>
         <div class="clinical-cue" id="clinicalCue" aria-live="off">เลือก Rhythm เพื่อแสดงข้อความเตือนตามแนวทาง Adult ACLS 2025 (Demo)</div>
@@ -71,33 +86,53 @@
         </div>
       </section>
 
-      <section id="controllerPanel" class="controller" aria-label="CPR controller">
-        <div class="section-title"><h2>Controller</h2><span>กดจาก iPhone / iPad แล้ว TV เปลี่ยนตาม</span></div>
-        <div class="button-grid">
+      <section id="controllerPanel" class="controller" aria-label="CPR remote controller">
+        <div class="section-title"><h2>CPR REMOTE</h2><span>กดจากมือถือ • ส่งผลไปทีวีทันที</span></div>
+        <div class="quick-status"><strong data-bind="phase">STANDBY</strong><span>CPR <b data-bind="cycle">02:00</b></span><span>ยา <b data-bind="epiTime">00:00</b></span><span>CO₂ <b data-bind="etco2">—</b></span></div>
+        <div id="rhythmWarning" class="rhythm-warning" hidden>⚠️ เริ่ม CPR แล้ว — กรุณาบันทึก Rhythm (เวลาเดินต่อได้)</div>
+        <div class="rhythm-selector">
+          <button data-action="rhythm" data-value="VF" class="action rhythm-button">⚡ VF</button>
+          <button data-action="rhythm" data-value="VT" class="action rhythm-button">⚡ VT (pulseless)</button>
+          <button data-action="rhythm" data-value="PEA" class="action rhythm-button">PEA</button>
+          <button data-action="rhythm" data-value="Asystole" class="action rhythm-button">ASYSTOLE</button>
+        </div>
+        <div id="peaWidthPicker" class="pea-width-picker" hidden>
+          <strong>PEA QRS COMPLEX — เลือกความกว้าง</strong>
+          <div class="pea-width-buttons">
+            <button data-action="peaWidth" data-value="Narrow" class="action">NARROW QRS</button>
+            <button data-action="peaWidth" data-value="Wide" class="action">WIDE QRS</button>
+          </div>
+          <p>พิจารณา POCUS หาสาเหตุที่แก้ไขได้ โดยไม่ทำให้การกดหน้าอกหยุดชะงัก</p>
+        </div>
+        <div class="button-grid remote-main">
           <button data-action="start" class="action start" id="startButton">▶ START CPR</button>
-          <button data-action="pause" class="action">Ⅱ PAUSE</button>
-          <button data-action="resume" class="action">▶ RESUME</button>
-          <button data-action="reset" class="action warning">↺ RESET TO STANDBY</button>
           <button data-action="shock" class="action shock">⚡ SHOCK +1</button>
           <button data-action="epi" class="action medication epi-muted" id="epiButton">💉 EPINEPHRINE +1</button>
           <button data-action="amio" class="action medication amio-muted" id="amioButton">💊 AMIODARONE 300 mg</button>
-          <button data-action="rhythm" data-value="VF/pVT" class="action">VF / pVT</button>
-          <button data-action="rhythm" data-value="PEA/Asystole" class="action">PEA / ASYSTOLE</button>
           <button data-action="rosc" class="action rosc">♥ ROSC</button>
-          <form id="etco2Form" class="etco2-form">
-            <label for="etco2Input">EtCO₂ (mmHg)</label>
-            <div class="etco2-input-row">
-              <input id="etco2Input" type="number" min="0" max="150" step="1" inputmode="numeric" placeholder="35" required>
-              <button id="etco2Submit" type="submit">บันทึก</button>
-            </div>
-          </form>
+          <div id="airwayAction" class="airway-action">
+            <button id="etTubeBtn" data-action="etTube" class="action airway">🫁 ET-TUBE</button>
+            <form id="etco2Form" class="etco2-form" hidden>
+              <label for="etco2Input">EtCO₂ (mmHg)</label>
+              <div class="etco2-input-row">
+                <input id="etco2Input" type="number" min="0" max="150" step="1" inputmode="numeric" placeholder="35" required>
+                <button id="etco2Submit" type="submit">บันทึก CO₂</button>
+              </div>
+            </form>
+          </div>
         </div>
-        <p id="drugHint" class="drug-hint">เลือก Rhythm ก่อนเพื่อแสดงคำแนะนำยา • ผู้ใช้บันทึกยาที่ให้จริงเท่านั้น</p>
+        <div class="remote-secondary">
+          <button id="pauseResumeBtn" class="small-control" data-action="pause">Ⅱ PAUSE</button>
+          <button id="resetBtn" class="small-control danger-control" data-action="reset">↺ RESET</button>
+          <button id="toggleMetronome" class="small-control metronome-button active" data-action="metro" aria-pressed="true">🎵 105 BPM ON</button>
+        </div>
+        <div class="controller-vent" id="controllerVent" hidden><span>🫁 ET-TUBE</span> <strong data-bind="ventTime">6</strong><span id="controllerVentLabel">NEXT BREATH</span></div>
+        <p id="drugHint" class="drug-hint">เริ่ม CPR แล้วเลือกระบุ Rhythm</p>
         <div class="link-grid">
           <button id="copyTvLink" class="link-btn">📺 คัดลอกลิงก์สำหรับ TV</button>
           <button id="copyControlLink" class="link-btn">📱 คัดลอกลิงก์ Controller</button>
         </div>
-        <p class="helper">ปุ่มบันทึกเหตุการณ์ใช้เพื่อทดสอบ Sync เท่านั้น ไม่ใช่การแจ้งเตือนหรือคำแนะนำสำหรับ ACLS</p>
+        <p class="helper">DEMO ONLY • ไม่มีการยืนยันข้อมูลผู้ป่วยหรือการรับประกันการแจ้งเตือน</p>
       </section>
 
       <section class="timeline-section">
@@ -107,7 +142,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V0.4 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V0.5 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
