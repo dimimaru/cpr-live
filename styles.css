@@ -77,3 +77,54 @@ body.tv-mode .timeline li{font-size:16px}
  body.tv-mode .stat strong{font-size:42px}
  body.tv-mode .timeline{grid-template-columns:1fr;max-height:150px}
 }
+
+
+/* V0.3 — CPR alarm, independent timers and TV audio controls */
+.audio-toolbar{display:flex;align-items:center;gap:13px;justify-content:flex-end;margin:13px 0}
+body:not(.tv-mode) .audio-toolbar{display:none}
+.sound-button{color:#fff;background:#176e5a;border:1px solid #36c49f;border-radius:11px;padding:12px 17px;font-weight:800}
+.sound-button:active{transform:scale(.98)}
+.sound-button.enabled{background:#164434;border-color:#319975;color:#a4f5cf}
+.audio-status{color:#9db5d2;font-size:12px}
+.alarm-overlay{position:fixed;z-index:99;inset:0;pointer-events:none;display:none;align-items:center;justify-content:center;background:rgba(219,15,47,.50);border:16px solid rgba(255,45,71,.75)}
+.alarm-overlay.alarm-on{display:flex;animation:alarm-pulse 1.2s ease-in-out infinite}
+.alarm-content{background:rgba(38,0,8,.88);border:3px solid #ff7891;border-radius:25px;padding:28px 35px;box-shadow:0 0 70px rgba(255,0,35,.5);display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.alarm-content>span{font-weight:800;letter-spacing:.1em;font-size:clamp(17px,2.5vw,30px);color:#ffd5dc}
+.alarm-content strong{font-size:clamp(24px,4vw,63px);line-height:1.15}
+@keyframes alarm-pulse{0%,100%{background:rgba(219,15,47,.60);border-color:rgba(255,55,80,.9)}50%{background:rgba(219,15,47,.18);border-color:rgba(255,55,80,.26)}}
+@media(prefers-reduced-motion:reduce){.alarm-overlay.alarm-on{animation:none;background:rgba(190,15,45,.45)}}
+.episode-display{margin-top:12px;font-size:12px;letter-spacing:.08em;color:#9bb2d0;font-weight:700}
+.episode-display strong{color:#fff;margin-left:5px}
+.timer-stat strong{font-size:clamp(31px,4vw,64px);font-variant-numeric:tabular-nums}
+.timer-stat small{font-size:12px;color:#9bb8d5;font-weight:700;line-height:1.4}
+.timer-stat.due{border:2px solid #ff496d;background:#3f1829}
+.timer-stat.due strong,.timer-stat.due small{color:#ffc3cf}
+.stat.etco2-stat strong{font-size:clamp(30px,4vw,56px);white-space:nowrap}
+.etco2-stat strong small{font-size:14px;font-weight:700;color:#91aac7}
+.action.rosc{background:#17614d;border-color:#2eaf86}
+.etco2-form{border-radius:12px;background:#203751;border:1px solid #405b77;padding:10px 13px;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+.etco2-form label{font-size:12px;color:#c5d8ec;font-weight:800}
+.etco2-input-row{display:flex;gap:6px;min-width:0}
+.etco2-input-row input{width:100%;min-width:0;padding:9px;color:#fff;background:#08192c;border:1px solid #59728e;border-radius:8px;font-size:17px}
+.etco2-input-row button{background:#28678c;border-radius:8px;color:#fff;font-size:13px;font-weight:800;padding:10px 12px}
+.etco2-input-row button:disabled{opacity:.4}
+body.tv-mode .stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+body.tv-mode .stat:last-child{grid-column:auto}
+body.tv-mode .timer-stat{grid-column:span 2}
+body.tv-mode .timer-stat strong{font-size:clamp(42px,5.3vw,88px)}
+body.tv-mode .stat.etco2-stat strong{font-size:clamp(39px,4vw,75px)}
+body.tv-mode .monitor-main{gap:20px}
+@media(max-width:800px){
+ .audio-toolbar{flex-wrap:wrap;justify-content:flex-start;margin:10px 0}
+ .alarm-overlay{border-width:9px}
+ .alarm-content{padding:19px 15px;margin:16px}
+ .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .timer-stat{grid-column:span 2}
+ .timer-stat strong{font-size:38px}
+ .timer-stat small{font-size:10px}
+ .stat.etco2-stat strong{font-size:30px}
+ .stat.etco2-stat strong small{font-size:10px}
+ .etco2-form{min-height:80px}
+ body.tv-mode .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+ body.tv-mode .timer-stat strong{font-size:38px}
+}
