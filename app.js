@@ -388,6 +388,7 @@ function render() {
   const amioReady=cue.shockable && s.shock >= (amio300?3:5);
   const amioPrep=cue.shockable && ((amio300 && s.shock===2) ||
     (!amio300 && s.shock>=4 && s.shock<5));
+  if(!amio300 && amioPrep)amioButton.textContent="💊 AMIODARONE 150 mg · เตรียม";
   amioButton.classList.toggle("amio-highlight",amioReady);
   amioButton.classList.toggle("amio-prepare",amioPrep);
   amioButton.classList.toggle("amio-muted",!amioReady && !amioPrep);
@@ -464,6 +465,11 @@ async function handleAction(type,value) {
       s.amioDoses.length>=2)return;
     const next=s.amioDoses.length===0?300:150;
     if(s.shock<(next===300?3:4))return;
+    // The ERC 2025 guidance places the second dose after five shocks.
+    // After shock four, keep a manual override for documenting a dose
+    // actually administered by the clinician; never imply it is due.
+    if(next===150 && s.shock===4 &&
+      !confirm("ขณะนี้ Shock #4: ERC 2025 ระบุให้พิจารณา Amiodarone 150 mg หลัง Shock #5\nยืนยันว่ากำลังบันทึกยาที่ได้ให้จริง ไม่ใช่การสั่งให้ยาอัตโนมัติ?"))return;
     value=next;
   }
   const e={id:DEVICE_ID+"-"+(++sequence),type,ts:Date.now(),seq:sequence,value};
