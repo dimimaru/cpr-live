@@ -1,4 +1,4 @@
-// CPR Live v0.4 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v0.5 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -7,7 +7,7 @@ const cfg = window.CPR_CONFIG || {};
 const params = new URLSearchParams(location.search);
 const tvMode = params.get("view") === "tv";
 const DEVICE_ID = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + "-" + Math.random();
-const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","rosc","etco2"]);
+const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2"]);
 const TWO_MIN = 120000;
 const FOUR_MIN = 240000;
 const fmt = n => String(n).padStart(2,"0");
@@ -27,7 +27,7 @@ let audioContext = null;
 let nearAlarmKey = "";
 let cycleEndKey = "";
 let epiAlarmKey = "";
-let metronomeEnabled=true;
+// Metronome is shared session state (the TV follows the Controller).
 let nextMetronomeBeat=null;
 let currentMetronomeEpisode=null;
 const METRONOME_BPM=105;
@@ -48,7 +48,7 @@ function blankState() {
     pausedAt:null,
     frozenCycleMs:0,
     epiAnchor:null,        // Time since CPR start or latest documented epinephrine.
-    shock:0,epi:0,amioDoses:[],rhythm:"—",etco2:null,timeline:[]
+    shock:0,epi:0,amioDoses:[],rhythm:"—",peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,metronomeOn:true,timeline:[]
   };
 }
 function chronological() {
@@ -69,7 +69,7 @@ function computeState() {
       if (!recurrent) {
         s.sessionId=e.id;
         s.firstStartAt=t;
-        s.shock=0;s.epi=0;s.amioDoses=[];s.etco2=null;s.timeline=[];
+        s.shock=0;s.epi=0;s.amioDoses=[];s.etco2=null;s.advancedAirway=false;s.ventAnchor=null;s.timeline=[];
       }
       s.episode++;
       s.phase="running";
@@ -77,6 +77,8 @@ function computeState() {
       s.frozenCycleMs=0;
       s.pausedAt=null;
       s.rhythm="—";
+      s.peaWidth=null;
+      if(s.advancedAirway)s.ventAnchor=t; // Re-arrest: start a new 6-second breath cycle.
       // When no epinephrine has been recorded, the first/next arrest starts the
       // 4-minute demo timer. After a dose it tracks elapsed wall time since it.
       if (!s.epi) s.epiAnchor=t;
@@ -90,6 +92,7 @@ function computeState() {
       const gap=Math.max(0,t-s.pausedAt);
       s.cycleAnchor+=gap;
       if (s.epiAnchor!==null) s.epiAnchor+=Math.max(0,t-Math.max(s.pausedAt,s.epiAnchor));
+      if (s.ventAnchor!==null)s.ventAnchor+=Math.max(0,t-Math.max(s.pausedAt,s.ventAnchor));
       s.pausedAt=null;
       s.phase="running";
       line(s,e,"RESUME CPR TIMER");
@@ -111,13 +114,25 @@ function computeState() {
       s.amioDoses.push(e.value);
       line(s,e,"AMIODARONE "+e.value+" mg");
     } else if (["running","paused"].includes(s.phase) && e.type === "rhythm" &&
-      ["VF/pVT","PEA/Asystole"].includes(e.value)) {
+      ["VF","VT","PEA","Asystole"].includes(e.value)) {
       s.rhythm=e.value;
+      s.peaWidth=null;
       line(s,e,"RHYTHM: "+s.rhythm);
+    } else if (["running","paused"].includes(s.phase) && e.type === "peaWidth" &&
+      s.rhythm==="PEA" && ["Narrow","Wide"].includes(e.value)) {
+      s.peaWidth=e.value;
+      line(s,e,"PEA QRS: "+e.value);
+    } else if (["running","paused"].includes(s.phase) && e.type === "etTube" && !s.advancedAirway) {
+      s.advancedAirway=true;
+      s.ventAnchor=t;
+      line(s,e,"ET-TUBE (reported placed) — ventilation coach started");
+    } else if (e.type==="metro" && typeof e.value==="boolean") {
+      s.metronomeOn=e.value;
+      line(s,e,"METRONOME 105 BPM "+(e.value?"ON":"OFF"));
     } else if (["running","paused","rosc"].includes(s.phase) && e.type === "etco2" &&
-      Number.isInteger(e.value) && e.value>=0 && e.value<=150) {
+      s.advancedAirway && Number.isInteger(e.value) && e.value>=0 && e.value<=150) {
       s.etco2=e.value;
-      line(s,e,"EtCO₂: "+s.etco2+" mmHg");
+      line(s,e,"CO₂: "+s.etco2+" mmHg");
     }
   }
   return s;
@@ -129,7 +144,10 @@ function elapsedFor(s,now) {
   const epiMs=s.epiAnchor===null?0:
     s.phase==="paused"?Math.max(0,s.pausedAt-s.epiAnchor):
     Math.max(0,now-s.epiAnchor);
-  return {totalMs,cycleMs,epiMs};
+  const ventMs=s.ventAnchor===null?0:
+    s.phase==="running"?Math.max(0,now-s.ventAnchor):
+    s.phase==="paused"?Math.max(0,s.pausedAt-s.ventAnchor):0;
+  return {totalMs,cycleMs,epiMs,ventMs};
 }
 function timeText(ms) {
   const sec=Math.floor(Math.max(0,ms)/1000);
@@ -178,7 +196,7 @@ function soundNotice(text,urgent=false) {
   speak(text,urgent);
 }
 function shockAdvice(s) {
-  if(s.rhythm!=="VF/pVT")return "";
+  if(!["VF","VT"].includes(s.rhythm))return "";
   if(s.shock===1)return "ช็อกครั้งแรก ให้ต่อซีพีอาร์ทันที";
   if(s.shock===2)return "ช็อกครั้งที่สอง เตรียมอามิโอดาโรน สามร้อยมิลลิกรัม สำหรับหลังช็อกครั้งที่สาม และประเมินการให้อิพิเนฟรินตามแนวทาง เอ เอช เอ";
   if(s.shock===3)return "ช็อกครั้งที่สาม พิจารณาอามิโอดาโรน สามร้อยมิลลิกรัม หากยังเป็น วีเอฟ หรือ พีวีที";
@@ -189,20 +207,26 @@ function shockAdvice(s) {
 function announceEvent(e,s) {
   if (!audioReady || !tvMode) return;
   const spoken={
-    start:s.episode>1?"เริ่มซีพีอาร์อีกครั้ง ครั้งที่ "+s.episode:"เริ่มซีพีอาร์",
-    pause:"พักตัวจับเวลา ซีพีอาร์",
-    resume:"เริ่มนับเวลา ซีพีอาร์ ต่อ",
-    reset:"รีเซ็ต กลับสู่หน้ารอ",
+    start:s.episode>1?"เริ่มซีพีอาร์อีกครั้ง ครั้งที่ "+s.episode+" กรุณาบันทึกจังหวะหัวใจ":"เริ่มซีพีอาร์ กรุณาบันทึกจังหวะหัวใจทันที โดยไม่ต้องรอหยุดเวลา",
+    pause:"ยืนยันพักตัวจับเวลา ซีพีอาร์",
+    resume:"ยืนยันเริ่มนับเวลา ซีพีอาร์ ต่อ",
+    reset:"ยืนยันรีเซ็ต กลับสู่หน้ารอ",
     shock:"บันทึกช็อกครั้งที่ "+s.shock+" "+shockAdvice(s),
     epi:"บันทึกให้ยา อิพิเนฟริน ครั้งที่ "+s.epi+" เริ่มนับเวลายาใหม่",
     amio:"บันทึกให้ยา อามิโอดาโรน "+e.value+" มิลลิกรัม",
-    rhythm:e.value==="VF/pVT"?
-      "บันทึกจังหวะ วีเอฟ หรือ พีวีที เป็นจังหวะช็อกได้ เน้นการช็อกก่อน และพิจารณาอิพิเนฟรินหลังช็อกครั้งที่สอง":
-      "บันทึกจังหวะ พีอีเอ หรือ แอสซิสโตลี ไม่ช็อก ให้พิจารณาอิพิเนฟรินโดยเร็ว ตามแนวทาง",
+    rhythm:e.value==="VF"?"บันทึกจังหวะ วีเอฟ ช็อกได้":
+      e.value==="VT"?"บันทึกจังหวะ พัลส์เลส วีที ช็อกได้":
+      e.value==="PEA"?"บันทึกจังหวะ พีอีเอ เลือกแนโรหรือไวด์คิวอาร์เอส และพิจารณาทำอัลตราซาวด์ข้างเตียงเพื่อหาสาเหตุ ห้ามหยุดกดหน้าอกนาน":
+      "บันทึก แอสซิสโตลี ตรวจสอบแฟลตไลน์โปรโตคอล เช็กสายต่อ เกน และยืนยันจากสองลีด โดยไม่ชะลอการกดหน้าอก",
+    peaWidth:e.value==="Wide"?"พีอีเอ ไวด์คิวอาร์เอส พิจารณาอัลตราซาวด์ข้างเตียงเพื่อค้นหาสาเหตุที่แก้ไขได้":
+      "พีอีเอ แนโรคิวอาร์เอส พิจารณาอัลตราซาวด์ข้างเตียงเพื่อค้นหาสาเหตุที่แก้ไขได้",
+    etTube:"บันทึก ใส่ท่อช่วยหายใจแล้ว เริ่มตัวช่วยจังหวะช่วยหายใจทุกหกวินาที",
+    metro:e.value?"เปิดจังหวะช่วยกดหน้าอก หนึ่งร้อยห้าครั้งต่อนาที":"ปิดเสียงจังหวะช่วยกดหน้าอก",
     rosc:"บันทึก อาร์ โอ เอส ซี ได้ชีพจรกลับมา หยุดรอบซีพีอาร์",
-    etco2:"บันทึก อีทีซีโอทู "+e.value+" มิลลิเมตรปรอท"
+    etco2:"บันทึก ซีโอทู "+e.value+" มิลลิเมตรปรอท"+
+      (e.value<10?" ซีโอทูต่ำกว่าสิบ ตรวจสอบคุณภาพการกดหน้าอก และปัจจัยอื่นที่มีผลต่อซีโอทู":"")
   };
-  soundNotice(spoken[e.type]||e.type,e.type==="rosc"||e.type==="start");
+  soundNotice(spoken[e.type]||e.type,e.type==="rosc"||e.type==="start"||e.type==="etco2"&&e.value<10);
 }
 function playMetronomeBeat(when) {
   if (!audioContext || audioContext.state!=="running")return;
@@ -220,7 +244,7 @@ function playMetronomeBeat(when) {
   } catch(err){console.warn("Metronome audio",err);}
 }
 function updateMetronome(s) {
-  const active=audioReady && tvMode && metronomeEnabled && connected &&
+  const active=audioReady && tvMode && s.metronomeOn && connected &&
     s.phase==="running" && audioContext && audioContext.state==="running";
   if(!active){nextMetronomeBeat=null;currentMetronomeEpisode=null;return;}
   const id=room+"|"+s.sessionId+"|"+s.episode;
@@ -238,21 +262,25 @@ function updateMetronome(s) {
   }
 }
 function medicationCue(s){
-  const epiReady=s.rhythm==="PEA/Asystole" ||
-    (s.rhythm==="VF/pVT" && s.shock>=2);
-  const shockable=s.rhythm==="VF/pVT";
+  const shockable=["VF","VT"].includes(s.rhythm);
+  const epiReady=["PEA","Asystole"].includes(s.rhythm) ||
+    (shockable && s.shock>=2);
   const amioCount=s.amioDoses.length;
   let cue="";
-  if (s.phase==="standby")cue="รอ START CPR — เลือก Rhythm เพื่อให้แสดงคำแนะนำตามลำดับ Shock";
-  else if (s.phase==="rosc")cue="ROSC — เฝ้าติดตามอาการ หาก Re-arrest สามารถกด START CPR ใหม่";
-  else if (s.rhythm==="—")cue="ยังไม่ได้ระบุ Rhythm — เลือก VF/pVT หรือ PEA/Asystole ก่อน";
-  else if (!shockable)cue="PEA/Asystole · Nonshockable — พิจารณา Epinephrine โดยเร็ว และ CPR ต่อเนื่อง";
-  else if(s.shock<2)cue="VF/pVT · Shock #"+s.shock+" — เน้น Defibrillation ก่อน; Epinephrine ยังไม่เน้น";
+  if(s.phase==="standby")cue="รอ START CPR — เริ่มแล้วบันทึก Rhythm โดยเร็ว";
+  else if(s.phase==="rosc")cue="ROSC — เฝ้าติดตามอาการ หาก Re-arrest สามารถกด START CPR ใหม่";
+  else if(s.rhythm==="—")cue="⚠️ กรุณาบันทึก Rhythm ตอนนี้ — CPR Timer นับต่อได้";
+  else if(s.rhythm==="PEA"){
+    const width=s.peaWidth?" ("+s.peaWidth+" QRS)":" — เลือก Narrow / Wide QRS";
+    cue="PEA"+width+" — พิจารณา POCUS เพื่อค้นหา reversible causes โดยไม่ขัดจังหวะ CPR; พิจารณา Epinephrine โดยเร็ว";
+  } else if(s.rhythm==="Asystole"){
+    cue="ASYSTOLE — FLAT-LINE PROTOCOL: ตรวจสาย/ขั้วไฟฟ้า, gain, ยืนยัน 2 leads และประเมิน fine VF; CPR ต่อเนื่อง, ไม่ช็อกเมื่อยืนยันแล้ว";
+  } else if(s.shock<2)cue=s.rhythm+" · Shock #"+s.shock+" — เน้น Defibrillation ก่อน; Epinephrine ยังไม่เน้น";
   else if(s.shock===2)cue="Shock #2 — ประเมิน Epinephrine; เตรียม Amiodarone 300 mg สำหรับหลัง Shock #3";
   else if(amioCount===0)cue="Shock #"+s.shock+" — พิจารณา Amiodarone 300 mg หากยัง VF/pVT";
   else if(amioCount===1 && s.shock===4)cue="Shock #4 — เตรียม Amiodarone 150 mg; ERC 2025 ระบุพิจารณาหลัง Shock #5";
   else if(amioCount===1 && s.shock>=5)cue="Shock #"+s.shock+" — พิจารณา Amiodarone 150 mg (ขนาดที่สอง) ตาม protocol";
-  else if(amioCount>=2)cue="บันทึก Amiodarone แล้วสองขนาด (300 + 150 mg) — ตรวจสอบ Timeline";
+  else if(amioCount>=2)cue="บันทึก Amiodarone สองขนาด (300 + 150 mg) แล้ว";
   else cue="VF/pVT — ให้ CPR ต่อเนื่อง ประเมิน Rhythm และยา ตาม ACLS";
   return {epiReady,cue,shockable,amioCount};
 }
