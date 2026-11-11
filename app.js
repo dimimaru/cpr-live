@@ -1,4 +1,4 @@
-// CPR Live v0.5 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v0.6 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -127,8 +127,8 @@ function computeState() {
       s.ventAnchor=t;
       line(s,e,"ET-TUBE (reported placed) — ventilation coach started");
     } else if (e.type==="metro" && typeof e.value==="boolean") {
+      // Sync metronome setting silently: no Timeline entry or spoken feedback.
       s.metronomeOn=e.value;
-      line(s,e,"METRONOME 105 BPM "+(e.value?"ON":"OFF"));
     } else if (["running","paused","rosc"].includes(s.phase) && e.type === "etco2" &&
       s.advancedAirway && Number.isInteger(e.value) && e.value>=0 && e.value<=150) {
       s.etco2=e.value;
@@ -221,7 +221,6 @@ function announceEvent(e,s) {
     peaWidth:e.value==="Wide"?"พีอีเอ ไวด์คิวอาร์เอส พิจารณาอัลตราซาวด์ข้างเตียงเพื่อค้นหาสาเหตุที่แก้ไขได้":
       "พีอีเอ แนโรคิวอาร์เอส พิจารณาอัลตราซาวด์ข้างเตียงเพื่อค้นหาสาเหตุที่แก้ไขได้",
     etTube:"บันทึก ใส่ท่อช่วยหายใจแล้ว เริ่มตัวช่วยจังหวะช่วยหายใจทุกหกวินาที",
-    metro:e.value?"เปิดจังหวะช่วยกดหน้าอก หนึ่งร้อยห้าครั้งต่อนาที":"ปิดเสียงจังหวะช่วยกดหน้าอก",
     rosc:"บันทึก อาร์ โอ เอส ซี ได้ชีพจรกลับมา หยุดรอบซีพีอาร์",
     etco2:"บันทึก ซีโอทู "+e.value+" มิลลิเมตรปรอท"+
       (e.value<10?" ซีโอทูต่ำกว่าสิบ ตรวจสอบคุณภาพการกดหน้าอก และปัจจัยอื่นที่มีผลต่อซีโอทู":"")
@@ -613,11 +612,31 @@ async function copyLink(view) {
     prompt("คัดลอกลิงก์นี้",url);
   }
 }
-// On TV, no test button or manual setup step. Browser may still block autoplay.
+// Expand the TV dashboard within its page automatically. True browser fullscreen
+// normally requires a direct local user interaction (browser security restriction).
+function requestTvFullscreen() {
+  if(!tvMode || document.fullscreenElement || document.webkitFullscreenElement)return;
+  const root=document.documentElement;
+  if(!root)return;
+  const go=root.requestFullscreen||root.webkitRequestFullscreen||root.msRequestFullscreen;
+  if(!go)return;
+  try {
+    const promise=go.call(root,{navigationUI:"hide"});
+    if(promise && typeof promise.catch==="function")promise.catch(()=>{
+      // Browser denied automatic fullscreen; use F11/kiosk mode, or touch TV once.
+    });
+  } catch(err){ /* TV browser may not implement fullscreen API */ }
+}
 if(tvMode){
   initTVAudio();
-  document.addEventListener("pointerdown",initTVAudio,{passive:true});
-  document.addEventListener("keydown",initTVAudio);
+  requestTvFullscreen(); // Works only if the browser grants activation-free fullscreen.
+  const firstInteraction=()=>{
+    requestTvFullscreen();
+    initTVAudio();
+  };
+  document.addEventListener("pointerdown",firstInteraction,{passive:true});
+  document.addEventListener("keydown",firstInteraction);
+  document.addEventListener("click",firstInteraction);
   document.addEventListener("visibilitychange",()=>{
     if(!document.hidden)initTVAudio();
   });
