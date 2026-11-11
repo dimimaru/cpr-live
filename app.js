@@ -322,14 +322,14 @@ function updateMetronome(s) {
     count++;
   }
 }
-function medicationCue(s){
+function medicationCue(s,clock){
   const shockable=["VF","VT"].includes(s.rhythm);
   const epiReady=["PEA","Asystole"].includes(s.rhythm) ||
     (shockable && s.shock>=2);
   const amioCount=s.amioDoses.length;
   let cue="";
   if(s.phase==="standby")cue="รอ START CPR — เริ่มแล้วบันทึก Rhythm โดยเร็ว";
-  else if(s.phase==="rosc")cue="ROSC — เฝ้าติดตามอาการ หาก Re-arrest สามารถกด START CPR ใหม่";
+  else if(s.phase==="rosc")cue="ROSC — 12-lead ECG, CXR, วัด V/S (BP HR RR SpO₂ Temp), ประเมิน GCS, Airway/Oxygenation/Perfusion; Re-arrest กด START CPR ใหม่";
   else if(s.rhythm==="—")cue="⚠️ กรุณาบันทึก Rhythm ตอนนี้ — CPR Timer นับต่อได้";
   else if(s.rhythm==="PEA"){
     const width=s.peaWidth?" ("+s.peaWidth+" QRS)":" — เลือก Narrow / Wide QRS";
@@ -343,6 +343,10 @@ function medicationCue(s){
   else if(amioCount===1 && s.shock>=5)cue="Shock #"+s.shock+" — พิจารณา Amiodarone 150 mg (ขนาดที่สอง) ตาม protocol";
   else if(amioCount>=2)cue="บันทึก Amiodarone สองขนาด (300 + 150 mg) แล้ว";
   else cue="VF/pVT — ให้ CPR ต่อเนื่อง ประเมิน Rhythm และยา ตาม ACLS";
+  if(shockable && s.phase==="running" && clock &&
+    clock.cycleMs%TWO_MIN>=TWO_MIN-10000){
+    cue+=" • ⚡ เตรียม Defibrillator / Charge ตาม Protocol ก่อนครบ 2 นาที; ตรวจ Rhythm ใหม่และยืนยัน VF/pVT ก่อน Shock";
+  }
   return {epiReady,cue,shockable,amioCount};
 }
 function updateAudioStatus(message,blocked=false) {
@@ -389,7 +393,9 @@ function checkAlarms(s,clock) {
     const key=room+"|"+s.sessionId+"|"+s.episode+"|"+cycleIndex;
     if (audioReady && tvMode && nearAlarmKey!==key) {
       nearAlarmKey=key;
-      announcements.push("อีกสิบวินาที ครบรอบซีพีอาร์สองนาที");
+      announcements.push(SHOCKABLE_RHYTHMS.has(s.rhythm)?
+        "อีกสิบวินาที ครบรอบซีพีอาร์สองนาที เตรียมเครื่องช็อกและชาร์จตามโปรโตคอลระหว่างกดหน้าอก ตรวจจังหวะอีกครั้งก่อนช็อก":
+        "อีกสิบวินาที ครบรอบซีพีอาร์สองนาที");
     }
   }
   if (ongoing && cycleIndex>=1 && audioReady && tvMode) {
@@ -400,15 +406,24 @@ function checkAlarms(s,clock) {
       if (cycle%TWO_MIN<3000)announcements.push("ครบสองนาที ตรวจจังหวะตามขั้นตอน");
     }
   }
-  const due=connected && ["running","paused"].includes(s.phase) && clock.epiMs>=FOUR_MIN && s.epiAnchor!==null;
+  const shockable=SHOCKABLE_RHYTHMS.has(s.rhythm);
+  const epiTarget=shockable?FIVE_MIN:FOUR_MIN;
+  const doseTimingActive=connected && ["running","paused"].includes(s.phase) && s.epiAnchor!==null;
+  const due=doseTimingActive && clock.epiMs>=epiTarget;
   const epiCard=document.getElementById("epiStat");
   epiCard.classList.toggle("due",!!due);
-  if (due && audioReady && tvMode) {
-    const key=room+"|"+s.sessionId+"|"+s.epiAnchor;
-    if (epiAlarmKey!==key) {
-      epiAlarmKey=key;
-      announcements.push("ครบสี่นาที นับจากการเริ่มหรือการบันทึกอิพิเนฟรินล่าสุด โปรดตรวจสอบการให้ยา");
-    }
+  const epiKey=room+"|"+s.sessionId+"|"+s.epiAnchor+"|"+epiTarget;
+  if(shockable && doseTimingActive &&
+      clock.epiMs>=epiTarget-EPI_PREWARN_MS && clock.epiMs<epiTarget &&
+      audioReady && epiPreAlertKey!==epiKey){
+    epiPreAlertKey=epiKey;
+    announcements.push("อีกสิบวินาทีจะครบห้านาทีหลังอิพิเนฟรินครั้งล่าสุด โปรดทบทวนเวลาการให้ยาตามโปรโตคอล");
+  }
+  if(due && audioReady && epiAlarmKey!==epiKey){
+    epiAlarmKey=epiKey;
+    announcements.push(shockable?
+      "ครบห้านาทีหลังอิพิเนฟริน โปรดทบทวนการให้ยาซ้ำตามโปรโตคอล":
+      "ครบสี่นาทีหลังอิพิเนฟริน โปรดทบทวนการให้ยาซ้ำตามโปรโตคอล");
   }
   // At 04:00, CPR and epinephrine alerts occur together: speak both, not
   // two interrupted speech utterances.
@@ -507,7 +522,7 @@ function render() {
   const clock=elapsedFor(s,Date.now());
   const cycleProgress=s.phase==="standby"?0:clock.cycleMs%TWO_MIN;
   const currentCycle=s.phase==="standby"?TWO_MIN:cycleProgress===0?TWO_MIN:TWO_MIN-cycleProgress;
-  const cue=medicationCue(s);
+  const cue=medicationCue(s,clock);
   const values={
     phase:s.phase==="running"?"CPR ACTIVE":s.phase==="paused"?"CPR PAUSED":
       s.phase==="rosc"?"ROSC — MONITORING":"STANDBY",
@@ -516,8 +531,8 @@ function render() {
     epiTime:s.epiAnchor===null?"00:00":timeText(clock.epiMs),
     epiReminder:s.epiAnchor===null?"รอเริ่ม CPR":
       s.phase==="rosc"?"ROSC • ไม่แจ้งเตือนยา":
-      clock.epiMs>=FOUR_MIN?"ครบ 4 นาที — ตรวจสอบ Protocol":
-      "นับต่อเนื่องจาก Epinephrine ครั้งล่าสุด",
+      clock.epiMs>=(SHOCKABLE_RHYTHMS.has(s.rhythm)?FIVE_MIN:FOUR_MIN)?
+        "ครบเป้าหมาย — ตรวจสอบ Protocol":"นับต่อเนื่องจาก Epinephrine ครั้งล่าสุด",
     shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm,etco2:s.etco2===null?"—":s.etco2,
     episode:s.episode,ccf:clock.ccf===null?"—":clock.ccf.toFixed(1)+"%",
     pauseTotal:timeText(clock.pauseMs),room
@@ -527,6 +542,12 @@ function render() {
       if (n.textContent!==String(val)) n.textContent=val;
     });
   }
+  document.getElementById("epiReminderTitle").textContent=
+    "EPINEPHRINE TIMER • "+(SHOCKABLE_RHYTHMS.has(s.rhythm)?"5":"4")+" MIN";
+  document.getElementById("amio300Badge").classList.toggle("administered",s.amioDoses.includes(300));
+  document.getElementById("amio150Badge").classList.toggle("administered",s.amioDoses.includes(150));
+  document.getElementById("roscChecklist").hidden=s.phase!=="rosc";
+  document.getElementById("roscChecklistMobile").hidden=s.phase!=="rosc";
   document.querySelector(".live-label").className="live-label"+
     (s.phase==="running"?" active":s.phase==="paused"?" paused":"");
   const log=document.getElementById("timeline");
