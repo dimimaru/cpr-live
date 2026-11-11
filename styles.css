@@ -618,3 +618,14 @@ body.tv-mode .pause-alarm-overlay.active span{
 @media(prefers-reduced-motion:reduce){
  body.tv-mode .pause-alarm-overlay.active{animation:none}
 }
+
+
+/* v0.9 — prevent accidental repeat SHOCK logging for 110 seconds. */
+.shock-control{display:flex;flex-direction:column;min-width:0;gap:4px}
+.shock-control .action.shock{flex:1;width:100%;min-height:71px}
+.shock-control .action.shock.cooldown-locked{
+  background:#293546;border:1px solid #586b81;color:#b8c6d7;
+  box-shadow:none;opacity:1;cursor:not-allowed;font-size:clamp(13px,3vw,18px);
+}
+.shock-cooldown-hint{color:#d5b77e;font-size:11px;text-align:center;font-weight:800;line-height:1.25}
+@media(max-width:500px){.shock-control .action.shock{min-height:71px}}
