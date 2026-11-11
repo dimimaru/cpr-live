@@ -168,7 +168,7 @@ function computeState() {
       s.rhythm=e.value;
       s.lastRhythmEventId=e.id;
       s.peaWidth=null;
-      line(s,e,"RHYTHM: "+s.rhythm);
+      line(s,e,"RHYTHM: "+(s.rhythm==="VT"?"pVT":s.rhythm));
     } else if (["running","paused"].includes(s.phase) && e.type === "peaWidth" &&
       s.rhythm==="PEA" && ["Narrow","Wide"].includes(e.value)) {
       s.peaWidth=e.value;
@@ -533,7 +533,7 @@ function render() {
       s.phase==="rosc"?"ROSC • ไม่แจ้งเตือนยา":
       clock.epiMs>=(SHOCKABLE_RHYTHMS.has(s.rhythm)?FIVE_MIN:FOUR_MIN)?
         "ครบเป้าหมาย — ตรวจสอบ Protocol":"นับต่อเนื่องจาก Epinephrine ครั้งล่าสุด",
-    shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm,etco2:s.etco2===null?"—":s.etco2,
+    shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm==="VT"?"pVT":s.rhythm,etco2:s.etco2===null?"—":s.etco2,
     episode:s.episode,ccf:clock.ccf===null?"—":clock.ccf.toFixed(1)+"%",
     pauseTotal:timeText(clock.pauseMs),room
   };
@@ -666,7 +666,7 @@ function render() {
   const entry=document.getElementById("etco2Input");
   const submit=document.getElementById("etco2Submit");
   entry.disabled=!connected || !s.advancedAirway || s.phase==="standby";
-  submit.disabled=entry.disabled;
+  submit.disabled=entry.disabled || actionCooldownRemaining(s,"etco2",Date.now())>0 || pendingActions.has("etco2");
   const startButton=document.getElementById("startButton");
   startButton.textContent=s.phase==="rosc"?"▶ RE-ARREST / START CPR":"▶ START CPR";
   const hint=document.getElementById("connectionHint");
@@ -936,7 +936,7 @@ function buildReportElement(s){
     ["SHOCKS",s.shock],
     ["EPINEPHRINE",s.epi],
     ["AMIODARONE",s.amioDoses.length?s.amioDoses.join(" + ")+" mg":"—"],
-    ["LAST RHYTHM",s.rhythm==="PEA"&&s.peaWidth?"PEA ("+s.peaWidth+" QRS)":s.rhythm],
+    ["LAST RHYTHM",s.rhythm==="PEA"&&s.peaWidth?"PEA ("+s.peaWidth+" QRS)":s.rhythm==="VT"?"pVT":s.rhythm],
     ["LAST CO₂",s.etco2===null?"—":s.etco2+" mmHg"]
   ];
   for(const [label,value] of items){
