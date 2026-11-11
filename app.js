@@ -1,4 +1,4 @@
-// CPR Live v0.7 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v0.8 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -47,6 +47,10 @@ function blankState() {
     episode:0,
     cycleAnchor:null,      // Per-episode CPR cycle elapsed, adjusted for pauses.
     pausedAt:null,
+    pauseId:null,
+    pauseAccruedMs:0,
+    arrestAccruedMs:0,
+    episodeStartAt:null,
     frozenCycleMs:0,
     epiAnchor:null,        // Time since CPR start or latest documented epinephrine.
     shock:0,epi:0,amioDoses:[],rhythm:"—",peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,metronomeOn:true,timeline:[]
@@ -75,8 +79,10 @@ function computeState() {
       s.episode++;
       s.phase="running";
       s.cycleAnchor=t;
+      s.episodeStartAt=t;
       s.frozenCycleMs=0;
       s.pausedAt=null;
+      s.pauseId=null;
       s.rhythm="—";
       s.peaWidth=null;
       if(s.advancedAirway)s.ventAnchor=t; // Re-arrest: start a new 6-second breath cycle.
@@ -85,21 +91,25 @@ function computeState() {
       if (!s.epi) s.epiAnchor=t;
       line(s,e,recurrent?"RE-ARREST — START CPR #"+s.episode:"START CPR");
     } else if (e.type === "pause" && s.phase === "running") {
-      s.frozenCycleMs=Math.max(0,t-s.cycleAnchor);
+      // Compression interruption does NOT stop the 2-min cycle or epinephrine clock.
       s.pausedAt=t;
+      s.pauseId=e.id;
       s.phase="paused";
-      line(s,e,"PAUSE CPR TIMER");
+      line(s,e,"PAUSE CHEST COMPRESSIONS");
     } else if (e.type === "resume" && s.phase === "paused") {
-      const gap=Math.max(0,t-s.pausedAt);
-      s.cycleAnchor+=gap;
-      if (s.epiAnchor!==null) s.epiAnchor+=Math.max(0,t-Math.max(s.pausedAt,s.epiAnchor));
-      if (s.ventAnchor!==null)s.ventAnchor+=Math.max(0,t-Math.max(s.pausedAt,s.ventAnchor));
+      const interruption=Math.max(0,t-s.pausedAt);
+      s.pauseAccruedMs+=interruption;
       s.pausedAt=null;
+      s.pauseId=null;
       s.phase="running";
-      line(s,e,"RESUME CPR TIMER");
+      line(s,e,"RESUME COMPRESSIONS — interruption "+timeText(interruption));
     } else if (e.type === "rosc" && ["running","paused"].includes(s.phase)) {
-      if (s.phase==="running")s.frozenCycleMs=Math.max(0,t-s.cycleAnchor);
+      if (s.pausedAt!==null) s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
+      s.arrestAccruedMs+=Math.max(0,t-s.episodeStartAt);
+      s.episodeStartAt=null;
+      s.frozenCycleMs=Math.max(0,t-s.cycleAnchor);
       s.pausedAt=null;
+      s.pauseId=null;
       s.phase="rosc";
       line(s,e,"ROSC — CPR STOPPED");
     } else if (["running","paused"].includes(s.phase) && e.type === "shock") {
@@ -140,15 +150,25 @@ function computeState() {
 }
 function elapsedFor(s,now) {
   const totalMs=s.firstStartAt===null?0:Math.max(0,now-s.firstStartAt);
+  const active=["running","paused"].includes(s.phase);
   const cycleMs=s.cycleAnchor===null?0:
-    s.phase==="running"?Math.max(0,now-s.cycleAnchor):s.frozenCycleMs;
-  const epiMs=s.epiAnchor===null?0:
-    s.phase==="paused"?Math.max(0,s.pausedAt-s.epiAnchor):
-    Math.max(0,now-s.epiAnchor);
+    active?Math.max(0,now-s.cycleAnchor):s.frozenCycleMs;
+  // Medication timer uses the time of the MOST RECENT documented dose,
+  // regardless of interruptions. No pause/resume action may shift this anchor.
+  const epiMs=s.epiAnchor===null?0:Math.max(0,now-s.epiAnchor);
   const ventMs=s.ventAnchor===null?0:
     s.phase==="running"?Math.max(0,now-s.ventAnchor):
     s.phase==="paused"?Math.max(0,s.pausedAt-s.ventAnchor):0;
-  return {totalMs,cycleMs,epiMs,ventMs};
+  const arrestMs=s.arrestAccruedMs+
+    (active && s.episodeStartAt!==null?Math.max(0,now-s.episodeStartAt):0);
+  const currentPauseMs=s.phase==="paused" && s.pausedAt!==null?
+    Math.max(0,now-s.pausedAt):0;
+  const pauseMs=Math.min(arrestMs,s.pauseAccruedMs+currentPauseMs);
+  const compressionMs=Math.max(0,arrestMs-pauseMs);
+  const ccf=arrestMs>0?(compressionMs/arrestMs)*100:null;
+  const pauseRemainingMs=Math.max(0,10000-currentPauseMs);
+  return {totalMs,cycleMs,epiMs,ventMs,arrestMs,pauseMs,currentPauseMs,
+    pauseRemainingMs,compressionMs,ccf};
 }
 function timeText(ms) {
   const sec=Math.floor(Math.max(0,ms)/1000);
