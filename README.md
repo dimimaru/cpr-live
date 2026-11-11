@@ -188,3 +188,22 @@ https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines/adult-basi
 2. Rapidly tap again. Confirm no additional SHOCK or Timeline event.
 3. At `00:01`, still locked. At `00:00`, the SHOCK button is available again.
 4. Export timeline if needed, then RESET to clear the lock for the next demo.
+
+
+## V1.0 — Remote input safeguards, rhythm confirmation and TV updates
+
+- PAUSE CPR no longer requires a confirmation dialog; RESUME and RESET still ask for confirmation. The 10-second interruption timer is unchanged.
+- EPINEPHRINE button: the first documented dose remains available. Subsequent dose logs are locked for 3 minutes (180 seconds) after the most recent accepted dose, with a live countdown. This is a duplicate-log prevention feature ONLY.
+- Epi reminder for VF/pVT: the demo TV now speaks at 4:50 (10-second warning) and at 5:00 after the timing anchor. In PEA/Asystole the previous 4:00 reminder remains. The 2025 AHA guideline recommends epinephrine dosing every 3–5 minutes and early use for nonshockable arrest.
+- Other input buttons (Rhythm, Amiodarone, EtCO2, ET-tube, metronome, Start, Pause, Resume, ROSC) have an independent 5-second cooldown between logs of the SAME action, with a synchronous in-flight guard. PAUSE and RESUME are distinct actions so a rapid RESUME is possible to minimize interrupted compressions.
+- Shock logging still has its 110-second duplicate guard. **Before EVERY new Shock log**, the controller must record a new VF or pVT rhythm event after the previously accepted Shock. PEA/Asystole and missing/stale rhythm cannot enable Shock.
+- If the prior recorded rhythm is VF/pVT, the last 10 seconds of the 2-minute cycle shows and speaks a reminder to prepare the defibrillator/charge according to local protocol, while confirming shockability on the NEW rhythm check before any Shock log.
+- TV: example ECG now appears INSIDE the LAST RHYTHM box (not beneath the CPR timer). The medication summary is split vertically: Epinephrine count above, and static Amiodarone 300 mg / 150 mg dose indicators below. Administered doses are highlighted; no amiodarone count is displayed.
+- Controller: rhythm button now reads pVT; EPINEPHRINE uses a heart symbol, AMIODARONE uses an injection symbol, and EPINEPHRINE no longer has the +1 suffix.
+- Post-ROSC checklist appears on both Controller and TV: 12-lead ECG, CXR as clinically indicated, BP/HR/RR/SpO2/temperature, GCS, and review airway, oxygenation and perfusion.
+
+Important: These UI cooldowns DO NOT govern actual medication or defibrillation and can prevent recording a genuine intervention if it occurs inside the demo lockout window. Public Supabase Broadcast can lose or reorder events and does not provide an authoritative clock or atomic lock. The web app remains SIMULATION-ONLY, never a reliable treatment or medical record system.
+
+Guidelines:
+- https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines/adult-advanced-life-support
+- https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines/post-cardiac-arrest-care
