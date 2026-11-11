@@ -171,3 +171,20 @@ Never use it to document identifiable patients or replace official CPR records.
 
 2025 AHA Adult BLS guidance: rhythm/pulse check should take no more than 10 seconds, and chest-compression fraction is the portion of arrest time with compressions.
 https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines/adult-basic-life-support
+
+
+## V0.9 — SHOCK button anti-double-tap cooldown
+
+- After one **successfully logged SHOCK**, the Controller's SHOCK button is disabled for **1 minute 50 seconds (110 seconds)**.
+- The button shows a live remaining countdown (for example `SHOCK · 01:49`) until the logging control is available again.
+- An immediate in-flight guard disables the button while waiting for Supabase acknowledgment, preventing rapid double taps from sending multiple SHOCK events.
+- Event reduction also rejects repeat SHOCK logs within 110 seconds of the last accepted SHOCK; this means late/out-of-order events and multiple controllers do not increment the count or Timeline for an extra shock in that interval, once their events have synchronized.
+- RESET clears the cooldown. ROSC followed by re-arrest **does not** clear a current cooldown until 110 seconds have elapsed.
+- This is only an **anti-duplicate event logging UI rule**. It is **not** a physical defibrillator lockout, a verified treatment rule, or a guaranteed multi-device atomic lock. A disconnected device, clock skew or concurrent events may cause temporary disagreement before synchronization; Supabase public Broadcast is not a clinically safe source of truth.
+
+### Quick test
+
+1. Start CPR and tap SHOCK +1 once. Confirm the count increments by exactly one and the button shows `01:50`.
+2. Rapidly tap again. Confirm no additional SHOCK or Timeline event.
+3. At `00:01`, still locked. At `00:00`, the SHOCK button is available again.
+4. Export timeline if needed, then RESET to clear the lock for the next demo.
