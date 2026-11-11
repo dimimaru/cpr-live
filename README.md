@@ -104,3 +104,45 @@ timers make this unsuitable as a resuscitation timer/coach during clinical care.
 - For an extended Windows monitor/TV, **F11 on Chrome/Edge** or browser kiosk mode is still needed if browser blocks scripted fullscreen. Browser URL/address bars cannot be forcibly hidden by the site without an allowed user gesture.
 
 **After deployment:** hard Refresh both Controller and TV. Compare on 16:9 screen; verify no cropping at lower resolutions (1366×768 and 1920×1080), including while ET-tube ventilation and high-quality CPR warnings are active.
+
+
+## V0.7 — TV-only CPR alarm and controller PDF timeline
+
+- **Alarm limited to TV Display:** when a running CPR cycle has 10 seconds remaining,
+  a flashing red screen-edge border appears on the TV. A central warning message
+  appears **only during the final 5 seconds**. The existing TV voice alert still
+  announces at the start of the 10-second warning and the 2-minute boundary.
+- **Controller has no alarm:** no full-screen red border, warning overlay, or
+  countdown alert speech on the mobile remote; the regular timer display continues.
+- **TV Live Timeline removed:** TV layout displays only CPR status, clocks,
+  shock/medication counts, Last Rhythm, CO₂, ventilation coach and clinical cue.
+- **Controller Timeline remains:** tap **REPORT PDF** to download an A4 timeline report.
+- **Patient label sticker box:** the PDF includes a blank **77 × 36 mm** rectangle
+  titled "PATIENT LABEL / ติดสติกเกอร์ผู้ป่วยที่นี่" for attaching a physical
+  printed hospital label **after the PDF is printed**. There is **no patient name or HN
+  text field in the web app**, and no patient sticker information is sent to Supabase.
+- Report includes case start, elapsed time, documented events with clock times and
+  time from case start, rhythm, shock, epinephrine, amiodarone and last CO₂.
+- PDF is created locally in the Controller browser using a pinned html2pdf.js
+  library. The external CDN delivers JavaScript only; the report content is
+  rendered and saved in-browser. If PDF download is unavailable (e.g., blocked CDN),
+  the app offers the browser's **Print / Save as PDF** fallback.
+- Timeline and PDF are **ephemeral**: closing all connected devices or resetting
+  the session may permanently remove the data. Reports are **not verified
+  medical documentation** and are for simulation/testing only.
+
+### V0.7 tests
+
+1. Mobile and TV CONNECTED in the same room.
+2. Press Start CPR. At 00:10 remaining, the **TV** shows the flashing border.
+3. At 00:05 remaining, a central text box appears on **TV only**.
+4. Confirm **no alarm overlay or alarm speech on the mobile Controller**.
+5. TV has **no Live Timeline** section.
+6. Controller still shows Timeline; tap **REPORT PDF**.
+7. Verify a downloadable A4 PDF, a blank patient sticker box at top right, and all
+   current session events in chronological order.
+8. Check multi-page PDF with a longer Timeline and try iOS Safari separately.
+
+**Clinical and privacy reminder:** This prototype uses public channels with no
+authenticated access, durable event storage or guaranteed timers/alarms.
+Never use it to document identifiable patients or replace official CPR records.
