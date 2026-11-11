@@ -684,7 +684,9 @@ function buildReportElement(s){
   const root=document.createElement("div");
   root.className="report-export";
   root.setAttribute("aria-label","CPR Timeline Report");
-  root.style.cssText="position:absolute;left:-11000px;top:0;width:190mm;background:#fff;color:#122137;padding:4mm;font:12px/1.45 -apple-system,BlinkMacSystemFont,'Noto Sans Thai',Tahoma,sans-serif;box-sizing:border-box;";
+  // The export root itself stays position:static; only its mount is offscreen.
+  // html2pdf clones the root, so it must not inherit a negative left coordinate.
+  root.style.cssText="position:static;width:190mm;background:#fff;color:#122137;padding:4mm;font:12px/1.45 -apple-system,BlinkMacSystemFont,'Noto Sans Thai',Tahoma,sans-serif;box-sizing:border-box;";
   const head=document.createElement("div");
   head.style.cssText="display:flex;align-items:stretch;justify-content:space-between;gap:6mm;border-bottom:2px solid #16314b;padding-bottom:4mm;margin-bottom:5mm;page-break-inside:avoid;";
   const left=document.createElement("div");
@@ -779,7 +781,11 @@ async function exportTimelinePDF(){
   const oldText=button.textContent;
   button.textContent="กำลังสร้าง PDF…";
   const root=buildReportElement(s);
-  document.body.append(root);
+  const mount=document.createElement("div");
+  mount.className="report-export-mount";
+  mount.style.cssText="position:fixed;left:-11000px;top:0;width:190mm;z-index:-1;";
+  mount.append(root);
+  document.body.append(mount);
   let fallback=false;
   try{
     await loadPdfLibrary();
@@ -796,9 +802,10 @@ async function exportTimelinePDF(){
   }catch(err){
     console.warn("PDF direct-download unavailable; using browser Print-to-PDF fallback",err);
     fallback=true;
-    root.style.position="static";
-    root.style.left="auto";
-    root.style.top="auto";
+    mount.style.position="static";
+    mount.style.left="auto";
+    mount.style.top="auto";
+    mount.style.zIndex="auto";
     root.style.width="190mm";
     document.body.classList.add("printing-cpr-report");
     let cleaned=false;
@@ -806,7 +813,7 @@ async function exportTimelinePDF(){
       if(cleaned)return;
       cleaned=true;
       document.body.classList.remove("printing-cpr-report");
-      root.remove();
+      mount.remove();
       button.disabled=false;
       button.textContent=oldText;
     };
@@ -817,7 +824,7 @@ async function exportTimelinePDF(){
     setTimeout(cleanup,60000);
   }finally{
     if(!fallback){
-      root.remove();
+      mount.remove();
       button.disabled=false;
       button.textContent=oldText;
     }
