@@ -12,7 +12,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.0</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.0.1</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -58,7 +58,7 @@
 
           </div>
           <div class="stats">
-            <div class="stat"><span>SHOCK</span><strong data-bind="shock">0</strong></div>
+            <div class="stat shock-count-stat"><span>SHOCK</span><strong data-bind="shock">0</strong></div>
             <div class="stat drug-stack">
               <div class="drug-half"><span>EPINEPHRINE</span><strong data-bind="epi">0</strong></div>
               <div class="drug-half amio-half"><span>AMIODARONE</span>
@@ -87,7 +87,6 @@
           </div>
         </div>
         <div class="ventilator" id="ventilator" hidden>
-          <div class="vent-title">VENTILATION AFTER ET TUBE · EVERY 6 SECONDS · NO AUDIO</div>
           <div class="vent-visual">
             <span class="bag-icon" id="bagIcon" aria-hidden="true">
               <svg viewBox="0 0 110 92" role="img" aria-label="Bag valve mask">
@@ -144,7 +143,7 @@
         </div>
         <div class="button-grid remote-main">
           <button data-action="start" class="action start" id="startButton">▶ START CPR</button>
-          <div class="shock-control"><button id="shockButton" data-action="shock" class="action shock">⚡ SHOCK +1</button><span id="shockCooldownHint" class="shock-cooldown-hint" hidden>Shock locked for 01:50</span></div>
+          <div class="shock-control"><button id="shockButton" data-action="shock" class="action shock">⚡ SHOCK</button><span id="shockCooldownHint" class="shock-cooldown-hint" hidden></span></div>
           <div class="epi-control"><button data-action="epi" class="action medication epi-muted" id="epiButton">❤️ EPINEPHRINE</button><span id="epiLockHint" class="drug-lock-hint" hidden>LOCKED</span></div>
           <button data-action="amio" class="action medication amio-muted" id="amioButton">💉 AMIODARONE 300 mg</button>
           <button data-action="rosc" class="action rosc">♥ ROSC</button>
@@ -191,7 +190,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.0 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.0.1 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
