@@ -1,4 +1,4 @@
-// CPR Live v0.6 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v0.7 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -308,11 +308,18 @@ function initTVAudio() {
 }
 function checkAlarms(s,clock) {
   const overlay=document.getElementById("alarmOverlay");
+  // There are deliberately NO CPR alarms, flashing overlays or alarm TTS on the mobile remote.
+  if(!tvMode){
+    overlay.classList.remove("alarm-on","message-on");
+    return;
+  }
   const ongoing=connected && s.phase==="running" && s.sessionId;
   const cycle=clock.cycleMs;
   const cycleIndex=Math.floor(cycle/TWO_MIN);
   const inLastTen=ongoing && cycle%TWO_MIN>=TWO_MIN-10000 && cycle%TWO_MIN<TWO_MIN;
+  const inLastFive=inLastTen && cycle%TWO_MIN>=TWO_MIN-5000;
   overlay.classList.toggle("alarm-on",!!inLastTen);
+  overlay.classList.toggle("message-on",!!inLastFive);
   const announcements=[];
   if (inLastTen) {
     document.getElementById("alarmSeconds").textContent=
@@ -473,6 +480,9 @@ function render() {
   renderAirwayAndRhythm(s);
   renderVentilation(s,clock);
   checkAlarms(s,clock);
+  if(!tvMode){
+    document.getElementById("exportPdfBtn").disabled=s.timeline.length===0;
+  }
   updateMetronome(s);
 }
 function status(value) {
@@ -641,6 +651,180 @@ if(tvMode){
     if(!document.hidden)initTVAudio();
   });
 }
+
+// Report is generated locally on the Controller. Patient sticker area stays blank:
+// do NOT transmit, collect, cache or upload patient names, HN or stickers.
+let pdfLibraryPromise=null;
+function loadPdfLibrary(){
+  if(window.html2pdf)return Promise.resolve(window.html2pdf);
+  if(pdfLibraryPromise)return pdfLibraryPromise;
+  pdfLibraryPromise=new Promise((resolve,reject)=>{
+    const script=document.createElement("script");
+    script.src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+    script.async=true;
+    script.onload=()=>window.html2pdf?resolve(window.html2pdf):reject(new Error("PDF library failed to load"));
+    script.onerror=()=>reject(new Error("Cannot load PDF library; offline or blocked CDN"));
+    document.head.append(script);
+  });
+  return pdfLibraryPromise.catch(err=>{pdfLibraryPromise=null;throw err;});
+}
+function reportCell(textValue,styles={}){
+  const el=document.createElement("td");
+  el.textContent=String(textValue);
+  Object.assign(el.style,styles);
+  return el;
+}
+function reportText(tag,value,cssText){
+  const node=document.createElement(tag);
+  node.textContent=String(value);
+  node.style.cssText=cssText||"";
+  return node;
+}
+function buildReportElement(s){
+  const root=document.createElement("div");
+  root.className="report-export";
+  root.setAttribute("aria-label","CPR Timeline Report");
+  root.style.cssText="position:absolute;left:-11000px;top:0;width:190mm;background:#fff;color:#122137;padding:4mm;font:12px/1.45 -apple-system,BlinkMacSystemFont,'Noto Sans Thai',Tahoma,sans-serif;box-sizing:border-box;";
+  const head=document.createElement("div");
+  head.style.cssText="display:flex;align-items:stretch;justify-content:space-between;gap:6mm;border-bottom:2px solid #16314b;padding-bottom:4mm;margin-bottom:5mm;page-break-inside:avoid;";
+  const left=document.createElement("div");
+  left.style.cssText="flex:1;min-width:0;";
+  left.append(reportText("h1","CPR LIVE — TIMELINE REPORT","margin:0 0 2mm;font-size:19px;line-height:1.2;color:#153b59;font-weight:800;"));
+  left.append(reportText("p","Generated: "+new Date().toLocaleString("th-TH",{hour12:false}),
+    "margin:2px 0;font-size:11px;"));
+  left.append(reportText("p","Room: "+room+"  |  Mode: SIMULATION",
+    "margin:2px 0;font-size:11px;"));
+  left.append(reportText("p","No patient information is stored or transmitted by this report feature.",
+    "margin:4px 0 0;font-size:9px;color:#646f7d;"));
+  const sticker=document.createElement("div");
+  sticker.style.cssText="flex:0 0 77mm;width:77mm;height:36mm;border:1.5px solid #536b83;border-radius:4px;display:flex;align-items:center;justify-content:center;text-align:center;padding:3mm;box-sizing:border-box;";
+  sticker.append(reportText("div","PATIENT LABEL\nติดสติกเกอร์ผู้ป่วยที่นี่",
+    "font-size:12px;font-weight:700;color:#9aa9b9;white-space:pre-line;line-height:1.6;"));
+  head.append(left,sticker);root.append(head);
+  root.append(reportText("h2","SESSION SUMMARY",
+    "font-size:13px;margin:3mm 0 2mm;color:#143451;"));
+  const totals=elapsedFor(s,Date.now());
+  const summary=document.createElement("div");
+  summary.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:2mm;margin-bottom:5mm;page-break-inside:avoid;";
+  const items=[
+    ["START",s.firstStartAt?new Date(s.firstStartAt).toLocaleString("th-TH",{hour12:false}):"—"],
+    ["TOTAL CASE TIME",timeText(totals.totalMs)],
+    ["STATUS",s.phase.toUpperCase()],
+    ["ARREST EPISODES",s.episode],
+    ["SHOCKS",s.shock],
+    ["EPINEPHRINE",s.epi],
+    ["AMIODARONE",s.amioDoses.length?s.amioDoses.join(" + ")+" mg":"—"],
+    ["LAST RHYTHM",s.rhythm==="PEA"&&s.peaWidth?"PEA ("+s.peaWidth+" QRS)":s.rhythm],
+    ["LAST CO₂",s.etco2===null?"—":s.etco2+" mmHg"]
+  ];
+  for(const [label,value] of items){
+    const item=document.createElement("div");
+    item.style.cssText="border:1px solid #d7e2eb;border-radius:4px;padding:2mm;min-height:15mm;box-sizing:border-box;overflow-wrap:anywhere;";
+    item.append(reportText("div",label,"font-size:9px;color:#526e83;font-weight:750;letter-spacing:.025em;"));
+    item.append(reportText("div",value,"font-size:12px;font-weight:750;margin-top:1mm;"));
+    summary.append(item);
+  }
+  root.append(summary);
+  root.append(reportText("h2","CHRONOLOGICAL EVENT LOG",
+    "font-size:13px;margin:4mm 0 2mm;color:#143451;"));
+  const table=document.createElement("table");
+  table.style.cssText="width:100%;border-collapse:collapse;table-layout:fixed;font-size:10.5px;";
+  const thead=document.createElement("thead");
+  const trh=document.createElement("tr");
+  for(const [title,width] of [["#","9%"],["CLOCK","22%"],["FROM START","20%"],["EVENT","49%"]]){
+    const th=document.createElement("th");
+    th.textContent=title;
+    th.style.cssText="border-bottom:2px solid #1c4f77;background:#eaf2f9;text-align:left;padding:2mm 1.5mm;word-wrap:break-word;width:"+width+";";
+    trh.append(th);
+  }
+  thead.append(trh);table.append(thead);
+  const tbody=document.createElement("tbody");
+  s.timeline.forEach((entry,index)=>{
+    const tr=document.createElement("tr");
+    tr.style.cssText="page-break-inside:avoid;break-inside:avoid;";
+    const values=[
+      index+1,
+      new Date(entry.ts).toLocaleTimeString("th-TH",{hour12:false}),
+      s.firstStartAt===null?"—":timeText(Math.max(0,entry.ts-s.firstStartAt)),
+      entry.label
+    ];
+    for(let i=0;i<values.length;i++){
+      const td=reportCell(values[i],{
+        borderBottom:"1px solid #d9e3ed",
+        padding:"2mm 1.5mm",
+        color:i===3?"#20364b":"#506378",
+        overflowWrap:"anywhere",
+        verticalAlign:"top",
+        background:index%2===1?"#f7f9fb":"#ffffff"
+      });
+      tr.append(td);
+    }
+    tbody.append(tr);
+  });
+  table.append(tbody);root.append(table);
+  root.append(reportText("p","SIMULATION / DEVELOPMENT ONLY — NOT A VERIFIED MEDICAL RECORD. Events may be lost or duplicated if devices disconnect.",
+    "font-size:9px;color:#9a4350;border-top:1px solid #d5dde5;padding-top:3mm;margin-top:6mm;"));
+  return root;
+}
+async function exportTimelinePDF(){
+  if(tvMode)return;
+  const s=computeState();
+  if(!s.timeline.length){
+    alert("ยังไม่มี Timeline ให้สร้างรายงาน กรุณาเริ่ม CPR ก่อน");
+    return;
+  }
+  const button=document.getElementById("exportPdfBtn");
+  if(button.disabled)return;
+  button.disabled=true;
+  const oldText=button.textContent;
+  button.textContent="กำลังสร้าง PDF…";
+  const root=buildReportElement(s);
+  document.body.append(root);
+  let fallback=false;
+  try{
+    await loadPdfLibrary();
+    if(!window.html2pdf)throw new Error("PDF library unavailable");
+    const filename="CPR_Timeline_"+new Date().toISOString().slice(0,10)+".pdf";
+    await window.html2pdf().set({
+      margin:[8,10,8,10],
+      filename,
+      image:{type:"jpeg",quality:.98},
+      html2canvas:{scale:2,backgroundColor:"#ffffff",useCORS:false,scrollY:0},
+      jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
+      pagebreak:{mode:["css","legacy"],avoid:["tr",".report-sticker"]}
+    }).from(root).save();
+  }catch(err){
+    console.warn("PDF direct-download unavailable; using browser Print-to-PDF fallback",err);
+    fallback=true;
+    root.style.position="static";
+    root.style.left="auto";
+    root.style.top="auto";
+    root.style.width="190mm";
+    document.body.classList.add("printing-cpr-report");
+    let cleaned=false;
+    const cleanup=()=>{
+      if(cleaned)return;
+      cleaned=true;
+      document.body.classList.remove("printing-cpr-report");
+      root.remove();
+      button.disabled=false;
+      button.textContent=oldText;
+    };
+    window.addEventListener("afterprint",cleanup,{once:true});
+    alert("เปิดหน้าพิมพ์เพื่อเลือก Save as PDF / บันทึกเป็น PDF (อาจต้องเลือก Print หรือ Share บน iPhone)");
+    window.print();
+    // Some mobile browsers never fire afterprint.
+    setTimeout(cleanup,60000);
+  }finally{
+    if(!fallback){
+      root.remove();
+      button.disabled=false;
+      button.textContent=oldText;
+    }
+  }
+}
+
+document.getElementById("exportPdfBtn").addEventListener("click",exportTimelinePDF);
 document.getElementById("joinRoomBtn").addEventListener("click",()=>enterRoom(document.getElementById("roomInput").value));
 document.getElementById("roomInput").addEventListener("keydown",e=>{
   if (e.key==="Enter")enterRoom(e.currentTarget.value);
