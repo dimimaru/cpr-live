@@ -629,3 +629,76 @@ body.tv-mode .pause-alarm-overlay.active span{
 }
 .shock-cooldown-hint{color:#d5b77e;font-size:11px;text-align:center;font-weight:800;line-height:1.25}
 @media(max-width:500px){.shock-control .action.shock{min-height:71px}}
+
+
+/* CPR Live v1.0: medication half-panel, ECG within Last Rhythm and post-ROSC guidance. */
+body.tv-mode .stats>.stat.drug-stack{
+  display:grid;grid-template-columns:1fr;grid-template-rows:repeat(2,minmax(0,1fr));
+  gap:0;padding:0!important;overflow:hidden;min-height:0;
+}
+body.tv-mode .drug-half{
+  display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;
+  padding:3px 5px;min-width:0;min-height:0;overflow:hidden;
+}
+body.tv-mode .drug-half>span{font-size:clamp(8px,.70vw,11px);font-weight:800;line-height:1.05;white-space:nowrap}
+body.tv-mode .drug-half>strong{
+  font-size:clamp(15px,1.4vw,23px)!important;line-height:1.05;
+  color:#fff;font-variant-numeric:tabular-nums;
+}
+body.tv-mode .drug-half.amio-half{
+  border-top:1px solid #55708c;background:#162d40;padding:3px 2px;
+}
+body.tv-mode .amio-dose-row{
+  display:flex;align-items:center;justify-content:center;gap:3px;flex-wrap:wrap;
+  font-size:clamp(8px,.65vw,11px);max-width:100%;
+}
+body.tv-mode .amio-dose-row span{
+  color:#92a8bc;border:1px solid #455c72;border-radius:4px;
+  padding:2px 3px;font-size:inherit;font-weight:800;white-space:nowrap;
+}
+body.tv-mode .amio-dose-row span.administered{
+  color:#fff;background:#13674d;border-color:#36d39b;
+}
+body.tv-mode .stats>.stat.rhythm-stat{
+  display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;
+  padding:5px 7px!important;gap:2px!important;overflow:hidden;
+}
+body.tv-mode .stats>.stat.rhythm-stat>span{font-size:clamp(9px,.8vw,12px);flex:0 0 auto}
+body.tv-mode .stats>.stat.rhythm-stat .rhythm{
+  font-size:clamp(15px,1.8vw,29px);min-height:0;flex:0 0 auto;
+  margin:0;white-space:nowrap;line-height:1.05;
+}
+body.tv-mode .stats>.stat.rhythm-stat .ecg-panel{
+  display:flex;flex:1 1 auto;
+  min-height:0;max-height:70px;width:100%;
+  margin:0;padding:1px 5px;border-radius:5px;
+  overflow:hidden;gap:0;
+}
+body.tv-mode .stats>.stat.rhythm-stat .ecg-heading{
+  flex:0 0 auto;font-size:8px;line-height:1.1;
+}
+body.tv-mode .stats>.stat.rhythm-stat .ecg-heading strong{font-size:9px}
+body.tv-mode .stats>.stat.rhythm-stat .ecg-monitor{
+  flex:1 1 auto;width:100%;height:100%;min-height:18px;
+}
+body.tv-mode .stats>.stat.rhythm-stat .ecg-disclaimer{
+  flex:0 0 auto;font-size:7px;line-height:1.05;letter-spacing:0;
+}
+.epi-control{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:0}
+.epi-control .action{width:100%;flex:1;min-height:71px;max-width:100%}
+.epi-control .action.epi-locked{background:#293546;color:#c3ccda;opacity:1}
+.drug-lock-hint{color:#d4ba82;font-size:10px;line-height:1.2;font-weight:800;text-align:center}
+.rosc-checklist{
+  display:flex;flex-direction:column;gap:4px;
+  padding:8px 13px;flex:0 0 auto;
+  background:#0e533e;color:#eafff5;border:1px solid #39b98c;
+  border-radius:8px;font-size:clamp(11px,1vw,14px);line-height:1.4;
+}
+.rosc-checklist strong{font-size:clamp(12px,1.15vw,16px);letter-spacing:.04em}
+.rosc-checklist.mobile{font-size:12px;margin-top:9px}
+body.tv-mode .rosc-checklist{margin:0 8px 4px;max-height:90px;overflow:hidden}
+@media(max-height:680px) and (min-aspect-ratio:1/1){
+ body.tv-mode .stats>.stat.rhythm-stat .ecg-panel{max-height:45px}
+ body.tv-mode .stats>.stat.rhythm-stat .ecg-monitor{min-height:13px}
+ body.tv-mode .rosc-checklist{padding:4px 7px;font-size:10px}
+}
