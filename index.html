@@ -12,7 +12,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.9</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.0</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -55,6 +55,17 @@
             <div class="clock" data-bind="cycle">02:00</div>
             <div class="small-display">TOTAL CASE TIME <span data-bind="elapsed">00:00</span></div>
             <div class="episode-display">ARREST EPISODE <strong data-bind="episode">0</strong></div>
+
+          </div>
+          <div class="stats">
+            <div class="stat"><span>SHOCK</span><strong data-bind="shock">0</strong></div>
+            <div class="stat drug-stack">
+              <div class="drug-half"><span>EPINEPHRINE</span><strong data-bind="epi">0</strong></div>
+              <div class="drug-half amio-half"><span>AMIODARONE</span>
+                <div class="amio-dose-row"><span id="amio300Badge">300 mg</span><span id="amio150Badge">150 mg</span></div>
+              </div>
+            </div>
+            <div class="stat rhythm-stat"><span>LAST RHYTHM</span><strong class="rhythm" data-bind="rhythm">—</strong>
             <div class="ecg-panel" id="ecgPanel" aria-label="Illustrative ECG waveform; not patient data" hidden>
               <div class="ecg-heading"><span>EXAMPLE ECG</span><strong id="ecgTitle">—</strong></div>
               <svg class="ecg-monitor" viewBox="0 0 640 104" preserveAspectRatio="none" aria-hidden="true">
@@ -66,12 +77,8 @@
               </svg>
               <div class="ecg-disclaimer">SIMULATED RHYTHM • NOT A REAL ECG</div>
             </div>
-          </div>
-          <div class="stats">
-            <div class="stat"><span>SHOCK</span><strong data-bind="shock">0</strong></div>
-            <div class="stat"><span>EPINEPHRINE</span><strong data-bind="epi">0</strong></div>
-            <div class="stat rhythm-stat"><span>LAST RHYTHM</span><strong class="rhythm" data-bind="rhythm">—</strong></div>
-            <div class="stat timer-stat" id="epiStat"><span>EPINEPHRINE TIMER • 4 MIN</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
+            </div>
+            <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER • 4 MIN</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
             <div class="stat etco2-stat" id="co2Stat">
               <span>EtCO₂</span>
               <div class="co2-value"><strong data-bind="etco2">—</strong><small>mmHg</small></div>
@@ -95,6 +102,10 @@
           </div>
         </div>
         <div class="clinical-cue" id="clinicalCue" aria-live="off">เลือก Rhythm เพื่อแสดงข้อความเตือนตามแนวทาง Adult ACLS 2025 (Demo)</div>
+        <div class="rosc-checklist" id="roscChecklist" hidden>
+          <strong>POST-ROSC CHECKLIST</strong>
+          <span>12-lead ECG · CXR · Full V/S (BP, HR, RR, SpO₂, Temp) · GCS · reassess airway/oxygenation/perfusion</span>
+        </div>
         <div class="monitor-foot">
           <span id="connectionHint">เปิดหน้าเว็บค้างไว้เพื่อรอการเชื่อมต่อ</span>
           <span>SIMULATION ONLY · NO PATIENT DATA</span>
@@ -107,7 +118,7 @@
         <div id="rhythmWarning" class="rhythm-warning" hidden>⚠️ เริ่ม CPR แล้ว — กรุณาบันทึก Rhythm (เวลาเดินต่อได้)</div>
         <div class="rhythm-selector">
           <button data-action="rhythm" data-value="VF" class="action rhythm-button">⚡ VF</button>
-          <button data-action="rhythm" data-value="VT" class="action rhythm-button">⚡ VT (pulseless)</button>
+          <button data-action="rhythm" data-value="VT" class="action rhythm-button">⚡ pVT</button>
           <button data-action="rhythm" data-value="PEA" class="action rhythm-button">PEA</button>
           <button data-action="rhythm" data-value="Asystole" class="action rhythm-button">ASYSTOLE</button>
         </div>
@@ -134,8 +145,8 @@
         <div class="button-grid remote-main">
           <button data-action="start" class="action start" id="startButton">▶ START CPR</button>
           <div class="shock-control"><button id="shockButton" data-action="shock" class="action shock">⚡ SHOCK +1</button><span id="shockCooldownHint" class="shock-cooldown-hint" hidden>Shock locked for 01:50</span></div>
-          <button data-action="epi" class="action medication epi-muted" id="epiButton">💉 EPINEPHRINE +1</button>
-          <button data-action="amio" class="action medication amio-muted" id="amioButton">💊 AMIODARONE 300 mg</button>
+          <div class="epi-control"><button data-action="epi" class="action medication epi-muted" id="epiButton">❤️ EPINEPHRINE</button><span id="epiLockHint" class="drug-lock-hint" hidden>LOCKED</span></div>
+          <button data-action="amio" class="action medication amio-muted" id="amioButton">💉 AMIODARONE 300 mg</button>
           <button data-action="rosc" class="action rosc">♥ ROSC</button>
           <div id="airwayAction" class="airway-action">
             <button id="etTubeBtn" data-action="etTube" class="action airway">🫁 ET-TUBE</button>
@@ -159,6 +170,8 @@
           <strong id="pauseCountdown">10</strong><span>s left before warning</span>
         </div>
         <div id="ccfSummary" class="ccf-summary" hidden>FINAL CCF <strong data-bind="ccf">—</strong> • Recorded pauses <strong data-bind="pauseTotal">00:00</strong></div>
+        <div id="roscChecklistMobile" class="rosc-checklist mobile" hidden><strong>POST-ROSC CHECKLIST</strong>
+          <span>12-lead ECG · CXR · วัด V/S: BP, HR, RR, SpO₂, Temp · ประเมิน GCS · ตรวจ Airway / Oxygenation / Perfusion</span></div>
         <p id="drugHint" class="drug-hint">เริ่ม CPR แล้วเลือกระบุ Rhythm</p>
         <div class="link-grid">
           <button id="copyTvLink" class="link-btn">📺 คัดลอกลิงก์สำหรับ TV</button>
@@ -178,7 +191,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V0.9 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.0 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
