@@ -599,9 +599,8 @@ function render() {
   if(shockLocked){
     const seconds=Math.ceil(shockRemaining/1000);
     const remainingText=fmt(Math.floor(seconds/60))+":"+fmt(seconds%60);
-    shockButton.textContent="⚡ SHOCK · "+remainingText;
-    shockHint.textContent="LOCKED · NEXT SHOCK LOG IN "+remainingText;
-    shockHint.hidden=false;
+    shockButton.textContent=remainingText;
+    shockHint.hidden=true; // No duplicate cooldown message below the button.
   }else if(pendingShock){
     shockButton.textContent="⚡ SAVING SHOCK…";
     shockHint.textContent="กำลังบันทึก Shock";
@@ -1069,7 +1068,6 @@ document.querySelectorAll("[data-action]").forEach(btn=>
         "\nกรุณา Export PDF ก่อนล้างข้อมูลทั้งหมด"))return;
     }
     // PAUSE CPR must be immediate: confirmation would add avoidable hands-off delay.
-    if(action==="resume" && !confirm("ยืนยันกลับมากดหน้าอกต่อแล้ว?"))return;
     handleAction(action,btn.dataset.value);
   })
 );
