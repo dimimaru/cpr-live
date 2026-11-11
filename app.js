@@ -1,4 +1,4 @@
-// CPR Live v0.8 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v0.9 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -10,6 +10,7 @@ const DEVICE_ID = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
 const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2"]);
 const TWO_MIN = 120000;
 const FOUR_MIN = 240000;
+const SHOCK_COOLDOWN_MS = 110000; // 1 minute 50 seconds
 const fmt = n => String(n).padStart(2,"0");
 const roomClean = v => String(v || "").toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,40) || "ER-DEMO-01";
 let room = roomClean(params.get("room") || cfg.defaultRoom);
@@ -19,6 +20,7 @@ let connected = false;
 let messages = new Map();
 let sequence = 0;
 let switchingRoom = false;
+let pendingShock = false; // Synchronous in-flight guard against rapid double clicks.
 
 // Audio is deliberately TV-only. Browsers require a gesture on each TV page
 // before sound and Web Speech are reliably permitted.
@@ -54,7 +56,7 @@ function blankState() {
     episodeStartAt:null,
     frozenCycleMs:0,
     epiAnchor:null,        // Time since CPR start or latest documented epinephrine.
-    shock:0,epi:0,amioDoses:[],rhythm:"—",peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,metronomeOn:true,timeline:[]
+    shock:0,lastShockAt:null,epi:0,amioDoses:[],rhythm:"—",peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,metronomeOn:true,timeline:[]
   };
 }
 function chronological() {
@@ -75,7 +77,7 @@ function computeState() {
       if (!recurrent) {
         s.sessionId=e.id;
         s.firstStartAt=t;
-        s.shock=0;s.epi=0;s.amioDoses=[];s.etco2=null;s.advancedAirway=false;s.ventAnchor=null;s.timeline=[];
+        s.shock=0;s.lastShockAt=null;s.epi=0;s.amioDoses=[];s.etco2=null;s.advancedAirway=false;s.ventAnchor=null;s.timeline=[];
       }
       s.episode++;
       s.phase="running";
@@ -114,8 +116,14 @@ function computeState() {
       s.phase="rosc";
       line(s,e,"ROSC — CPR STOPPED");
     } else if (["running","paused"].includes(s.phase) && e.type === "shock") {
-      s.shock++;
-      line(s,e,"SHOCK #"+s.shock);
+      // Shared event-source guard: only the earliest shock in each 110s window
+      // is counted, even if several controllers broadcast duplicate clicks.
+      // This is UI/logging protection, not an electrical defibrillator lockout.
+      if(s.lastShockAt===null || t-s.lastShockAt>=SHOCK_COOLDOWN_MS){
+        s.shock++;
+        s.lastShockAt=t;
+        line(s,e,"SHOCK #"+s.shock);
+      }
     } else if (["running","paused"].includes(s.phase) && e.type === "epi") {
       s.epi++;
       s.epiAnchor=t;
@@ -523,6 +531,28 @@ function render() {
       (action==="peaWidth" && (!active || s.rhythm!=="PEA")) ||
       (action==="etTube" && (!active || s.advancedAirway));
   }
+  const shockButton=document.getElementById("shockButton");
+  const shockHint=document.getElementById("shockCooldownHint");
+  const shockRemaining=s.lastShockAt===null?0:
+    Math.min(SHOCK_COOLDOWN_MS,Math.max(0,s.lastShockAt+SHOCK_COOLDOWN_MS-Date.now()));
+  const shockLocked=shockRemaining>0;
+  shockButton.disabled=!connected || !["running","paused"].includes(s.phase) ||
+    shockLocked || pendingShock;
+  shockButton.classList.toggle("cooldown-locked",shockLocked || pendingShock);
+  if(shockLocked){
+    const seconds=Math.ceil(shockRemaining/1000);
+    const remainingText=fmt(Math.floor(seconds/60))+":"+fmt(seconds%60);
+    shockButton.textContent="⚡ SHOCK · "+remainingText;
+    shockHint.textContent="LOCKED · NEXT SHOCK LOG IN "+remainingText;
+    shockHint.hidden=false;
+  }else if(pendingShock){
+    shockButton.textContent="⚡ SAVING SHOCK…";
+    shockHint.textContent="กำลังบันทึก Shock";
+    shockHint.hidden=false;
+  }else{
+    shockButton.textContent="⚡ SHOCK +1";
+    shockHint.hidden=true;
+  }
   const pauseResume=document.getElementById("pauseResumeBtn");
   const resume=s.phase==="paused";
   pauseResume.dataset.action=resume?"resume":"pause";
@@ -621,6 +651,12 @@ async function handleAction(type,value) {
   if (type==="rosc" && !["running","paused"].includes(s.phase))return;
   if (type==="reset" && s.phase==="standby")return;
   if (["shock","epi","rhythm","peaWidth","etTube"].includes(type) && !["running","paused"].includes(s.phase))return;
+  if(type==="shock"){
+    if(pendingShock)return;
+    if(s.lastShockAt!==null && Date.now()<s.lastShockAt+SHOCK_COOLDOWN_MS)return;
+    pendingShock=true; // Lock before first await to prevent concurrent rapid taps.
+    render();
+  }
   if (type==="peaWidth" && s.rhythm!=="PEA")return;
   if (type==="etTube" && s.advancedAirway)return;
   if (type==="metro")value=!s.metronomeOn;
@@ -644,6 +680,11 @@ async function handleAction(type,value) {
   } catch(err) {
     alert("ส่งคำสั่งไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ: "+err.message);
     status("offline");
+  } finally {
+    if(type==="shock"){
+      pendingShock=false;
+      render();
+    }
   }
 }
 function setupChannel() {
@@ -680,6 +721,7 @@ async function enterRoom(value) {
     channel=null;
   }
   room=roomClean(value);
+  pendingShock=false;
   messages=new Map();
   nearAlarmKey=cycleEndKey=epiAlarmKey="";
   if ("speechSynthesis" in window)speechSynthesis.cancel();
