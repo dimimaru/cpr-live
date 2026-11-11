@@ -446,7 +446,7 @@ function checkAlarms(s,clock) {
   }
   const doseTimingActive=connected && ["running","paused"].includes(s.phase) && s.lastEpiAt!==null;
   const epiKey=room+"|"+s.sessionId+"|"+s.lastEpiAt;
-  if(doseTimingActive && clock.epiMs>=FOUR_MIN && clock.epiMs<FIVE_MIN-EPI_PREWARN_MS &&
+  if(doseTimingActive && !SHOCKABLE_RHYTHMS.has(s.rhythm) && clock.epiMs>=FOUR_MIN && clock.epiMs<FIVE_MIN-EPI_PREWARN_MS &&
       audioReady && epiAlarmKey!==epiKey+"|4"){
     // One 4-minute cue; a separate key below tracks the 5-minute boundary.
     epiAlarmKey=epiKey+"|4";
