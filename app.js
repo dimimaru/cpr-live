@@ -34,6 +34,7 @@ const METRONOME_BPM=105;
 const METRONOME_INTERVAL=60/METRONOME_BPM;
 
 document.body.classList.toggle("tv-mode",tvMode);
+document.getElementById("timelineSection").hidden=tvMode;
 document.getElementById("modeBadge").textContent = tvMode ? "TV DISPLAY" : "CONTROLLER";
 document.getElementById("roomInput").value = room;
 document.getElementById("roomLabel").textContent = room;
