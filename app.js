@@ -230,7 +230,7 @@ function announceEvent(e,s) {
   if (!audioReady || !tvMode) return;
   const spoken={
     start:s.episode>1?"เริ่มซีพีอาร์อีกครั้ง ครั้งที่ "+s.episode+" กรุณาบันทึกจังหวะหัวใจ":"เริ่มซีพีอาร์ กรุณาบันทึกจังหวะหัวใจทันที โดยไม่ต้องรอหยุดเวลา",
-    pause:"เริ่มนับช่วงหยุดกดหน้าอก ให้กลับมากดหน้าอกภายในสิบวินาที",
+    pause:"บันทึกหยุดกดหน้าอก เริ่มนับเวลาหยุด ให้กลับมากดหน้าอกภายในสิบวินาที",
     resume:"กลับมากดหน้าอกต่อแล้ว",
     reset:"ยืนยันรีเซ็ต กลับสู่หน้ารอ",
     shock:"บันทึกช็อกครั้งที่ "+s.shock+" "+shockAdvice(s),
@@ -360,7 +360,7 @@ function checkAlarms(s,clock) {
       if (cycle%TWO_MIN<3000)announcements.push("ครบสองนาที ตรวจจังหวะตามขั้นตอน");
     }
   }
-  const due=ongoing && clock.epiMs>=FOUR_MIN && s.epiAnchor!==null;
+  const due=connected && ["running","paused"].includes(s.phase) && clock.epiMs>=FOUR_MIN && s.epiAnchor!==null;
   const epiCard=document.getElementById("epiStat");
   epiCard.classList.toggle("due",!!due);
   if (due && audioReady && tvMode) {
@@ -476,8 +476,8 @@ function render() {
     epiTime:s.epiAnchor===null?"00:00":timeText(clock.epiMs),
     epiReminder:s.epiAnchor===null?"รอเริ่ม CPR":
       s.phase==="rosc"?"ROSC • ไม่แจ้งเตือนยา":
-      s.phase==="paused"?"PAUSED":clock.epiMs>=FOUR_MIN?"ครบ 4 นาที — ตรวจสอบ Protocol":
-      "เป้าหมายแจ้งเตือนที่ 04:00",
+      clock.epiMs>=FOUR_MIN?"ครบ 4 นาที — ตรวจสอบ Protocol":
+      "นับต่อเนื่องจาก Epinephrine ครั้งล่าสุด",
     shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm,etco2:s.etco2===null?"—":s.etco2,
     episode:s.episode,ccf:clock.ccf===null?"—":clock.ccf.toFixed(1)+"%",
     pauseTotal:timeText(clock.pauseMs),room
@@ -546,7 +546,8 @@ function render() {
   amioButton.classList.toggle("amio-muted",!amioReady && !amioPrep);
   amioButton.disabled=!connected || !["running","paused"].includes(s.phase) ||
     !cue.shockable || cue.amioCount>=2 || s.shock < (amio300?3:4);
-  document.getElementById("clinicalCue").textContent=cue.cue;
+  document.getElementById("clinicalCue").textContent=cue.cue+
+    (s.phase==="rosc" && clock.ccf!==null?" • DOCUMENTED CCF "+clock.ccf.toFixed(1)+"%":"");
   document.getElementById("drugHint").textContent=cue.cue+
     " • ปุ่ม Amiodarone บันทึกการให้ยาจริง ไม่ได้สั่งให้ยาอัตโนมัติ";
   const entry=document.getElementById("etco2Input");
@@ -796,6 +797,10 @@ function buildReportElement(s){
   const items=[
     ["START",s.firstStartAt?new Date(s.firstStartAt).toLocaleString("th-TH",{hour12:false}):"—"],
     ["TOTAL CASE TIME",timeText(totals.totalMs)],
+    ["ACTIVE ARREST TIME",timeText(totals.arrestMs)],
+    ["CCF (MANUAL PAUSES)",totals.ccf===null?"—":totals.ccf.toFixed(1)+"%"],
+    ["HANDS-OFF TIME",timeText(totals.pauseMs)],
+    ["COMPRESSION TIME",timeText(totals.compressionMs)],
     ["STATUS",s.phase.toUpperCase()],
     ["ARREST EPISODES",s.episode],
     ["SHOCKS",s.shock],
@@ -926,9 +931,15 @@ document.getElementById("copyControlLink").addEventListener("click",()=>copyLink
 document.querySelectorAll("[data-action]").forEach(btn=>
   btn.addEventListener("click",()=>{
     const action=btn.dataset.action;
-    if(action==="reset" && !confirm("ยืนยัน RESET? จะลบเวลา CPR, จำนวนยา และเหตุการณ์ทั้งหมดในห้องปัจจุบัน"))return;
-    if(action==="pause" && !confirm("ยืนยัน PAUSE CPR TIMER?"))return;
-    if(action==="resume" && !confirm("ยืนยัน RESUME CPR TIMER?"))return;
+    if(action==="reset"){
+      const state=computeState(),measurement=elapsedFor(state,Date.now());
+      const fraction=measurement.ccf===null?"—":measurement.ccf.toFixed(1)+"%";
+      if(!confirm("ยืนยัน RESET?\nEstimated CCF: "+fraction+
+        "\nRecorded hands-off: "+timeText(measurement.pauseMs)+
+        "\nกรุณา Export PDF ก่อนล้างข้อมูลทั้งหมด"))return;
+    }
+    if(action==="pause" && !confirm("ยืนยันเริ่มจับเวลาหยุดกดหน้าอก? เวลา CPR และยาไม่หยุดเดิน"))return;
+    if(action==="resume" && !confirm("ยืนยันกลับมากดหน้าอกต่อแล้ว?"))return;
     handleAction(action,btn.dataset.value);
   })
 );
