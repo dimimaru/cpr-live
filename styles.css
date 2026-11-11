@@ -702,3 +702,32 @@ body.tv-mode .rosc-checklist{margin:0 8px 4px;max-height:90px;overflow:hidden}
  body.tv-mode .stats>.stat.rhythm-stat .ecg-monitor{min-height:13px}
  body.tv-mode .rosc-checklist{padding:4px 7px;font-size:10px}
 }
+
+/* v1.0.1: centered Shock tally on TV, minimal single cooldown readout. */
+body.tv-mode .stats>.stat.shock-count-stat{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:17px 4px 4px!important;
+  min-width:0;
+}
+body.tv-mode .stats>.stat.shock-count-stat>span{
+  position:absolute;
+  top:6px;
+  left:0;
+  width:100%;
+  text-align:center;
+  line-height:1.05;
+}
+body.tv-mode .stats>.stat.shock-count-stat>strong{
+  display:block;
+  align-self:center;
+  width:100%;
+  text-align:center;
+  margin:0;
+  line-height:1;
+  font-size:clamp(20px,2.3vw,40px)!important;
+  font-variant-numeric:tabular-nums;
+}
+.shock-control>.action.cooldown-locked{font-variant-numeric:tabular-nums;letter-spacing:.03em}
