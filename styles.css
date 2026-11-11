@@ -731,3 +731,15 @@ body.tv-mode .stats>.stat.shock-count-stat>strong{
   font-variant-numeric:tabular-nums;
 }
 .shock-control>.action.cooldown-locked{font-variant-numeric:tabular-nums;letter-spacing:.03em}
+
+/* v1.0.2 — concise controls, visual medication urgency, mask CPR coaching */
+.small-control.resume-flash{background:#126c53;color:#fff;border-color:#64ebbc;animation:resume-pulse 1s ease-in-out infinite}
+@keyframes resume-pulse{50%{background:#239c73;box-shadow:0 0 0 4px #45d3a44a}}
+.epi-control .action.epi-urgent{background:#a51b37;border:2px solid #ff6886;color:white}
+body.tv-mode .stat.timer-stat.epi-green{background:#11533e;border-color:#48d6a3}
+body.tv-mode .drug-half.epi-green{background:#11533e;color:#ecfff7}
+body.tv-mode .stat.timer-stat.due,body.tv-mode .drug-half.epi-urgent{background:#a01e38!important;border-color:#ff718d!important;color:#fff}
+body.tv-mode .stat.timer-stat.due strong,body.tv-mode .stat.timer-stat.due small,body.tv-mode .drug-half.epi-urgent>span{color:#fff}
+body.tv-mode .ventilator.mask-coach .vent-time strong{font-size:clamp(24px,3.2vw,48px);white-space:nowrap}
+body.tv-mode .ventilator.mask-coach .vent-visual{gap:12px}
+@media(prefers-reduced-motion:reduce){.small-control.resume-flash{animation:none}}
