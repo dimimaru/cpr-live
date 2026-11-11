@@ -12,7 +12,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.6</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.7</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -147,14 +147,18 @@
         <p class="helper">DEMO ONLY • ไม่มีการยืนยันข้อมูลผู้ป่วยหรือการรับประกันการแจ้งเตือน</p>
       </section>
 
-      <section class="timeline-section">
-        <div class="section-title"><h2>Live Timeline</h2><span>บันทึกชั่วคราวบนหน้าจอเท่านั้น</span></div>
+      <section class="timeline-section" id="timelineSection">
+        <div class="section-title timeline-header">
+          <div><h2>Live Timeline</h2><span>บันทึกชั่วคราวบน Controller เท่านั้น</span></div>
+          <button id="exportPdfBtn" class="export-pdf-button" type="button">📄 REPORT PDF</button>
+        </div>
+        <p class="report-instructions">PDF จะมีช่องว่างสำหรับติดสติกเกอร์ Patient Label บนกระดาษ A4 — ไม่ต้องกรอกข้อมูลผู้ป่วยลงเว็บไซต์</p>
         <ol id="timeline" class="timeline"><li class="empty">ยังไม่มีเหตุการณ์</li></ol>
       </section>
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V0.6 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V0.7 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
