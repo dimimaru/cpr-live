@@ -146,3 +146,28 @@ timers make this unsuitable as a resuscitation timer/coach during clinical care.
 **Clinical and privacy reminder:** This prototype uses public channels with no
 authenticated access, durable event storage or guaranteed timers/alarms.
 Never use it to document identifiable patients or replace official CPR records.
+
+
+## V0.8 — Epi timer, TV example ECG, compression interruption and estimated CCF
+
+- After pressing EPINEPHRINE +1, the medication timer resets immediately to 00:00, then counts up from the latest recorded dose. The timer continues through compression interruptions.
+- TV shows non-diagnostic, *schematic ECG examples* for VF, pVT, Asystole, PEA Narrow QRS and PEA Wide QRS, updated from the controller. These are illustrative drawings, NOT actual ECG signals.
+- PAUSE CPR starts a manually logged hands-off interval, but DOES NOT stop the main CPR two-minute countdown, total clock, or epinephrine clock.
+- Controller shows a small 10-to-0-second interruption countdown. Once interruption reaches 10 seconds, TV only warns CONTINUE CPR NOW (audio when supported). RESUME CPR logs the interruption duration.
+- Metronome pauses with compressions and resumes after RESUME CPR. Confirm dialogs are kept for Pause/Resume.
+- CCF estimate (%) = (total recorded active arrest time minus logged hands-off time) / active arrest time × 100.
+- The denominator excludes ROSC periods; re-arrest episodes are included after they resume. The estimate is displayed in small text after ROSC, in RESET confirmation, and in Controller PDF report along with hands-off and compression times.
+- Because CCF is derived solely from button presses and device clocks, it does not measure actual physical compressions and can be inaccurate if events are missed, delayed, reordered or the browser is offline.
+- The system remains a publicly accessible, unauthenticated SIMULATION; not for live medical decision support or patient-identifying data.
+
+### Quick regression checks
+
+1. Press Epi at 1:39: both Controller and TV should show 00:00, then count up.
+2. Select VF / pVT / Asystole / PEA Narrow / PEA Wide: the illustrative waveform on TV changes.
+3. Pause after 1 min of CPR: the CPR and Epi clocks keep running while the interruption indicator counts down 10 to 0.
+4. At 0 seconds: TV displays an interruption alert prompting CONTINUE CPR. Resume closes the hands-off interval.
+5. Run 120 seconds of arrest with 9 seconds of Pause then ROSC: estimated CCF = 92.5%.
+6. Controller PDF contains Active Arrest Time, Hands-off Time, Compression Time and CCF.
+
+2025 AHA Adult BLS guidance: rhythm/pulse check should take no more than 10 seconds, and chest-compression fraction is the portion of arrest time with compressions.
+https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines/adult-basic-life-support
