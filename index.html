@@ -12,7 +12,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.0.1</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.0.2</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -60,7 +60,7 @@
           <div class="stats">
             <div class="stat shock-count-stat"><span>SHOCK</span><strong data-bind="shock">0</strong></div>
             <div class="stat drug-stack">
-              <div class="drug-half"><span>EPINEPHRINE</span><strong data-bind="epi">0</strong></div>
+              <div class="drug-half" id="epiCountHalf"><span>EPINEPHRINE</span><strong data-bind="epi">0</strong></div>
               <div class="drug-half amio-half"><span>AMIODARONE</span>
                 <div class="amio-dose-row"><span id="amio300Badge">300 mg</span><span id="amio150Badge">150 mg</span></div>
               </div>
@@ -78,7 +78,7 @@
               <div class="ecg-disclaimer">SIMULATED RHYTHM • NOT A REAL ECG</div>
             </div>
             </div>
-            <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER • 4 MIN</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
+            <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
             <div class="stat etco2-stat" id="co2Stat">
               <span>EtCO₂</span>
               <div class="co2-value"><strong data-bind="etco2">—</strong><small>mmHg</small></div>
@@ -88,6 +88,7 @@
         </div>
         <div class="ventilator" id="ventilator" hidden>
           <div class="vent-visual">
+            <span class="bag-icon" id="maskIcon" aria-hidden="true"><svg viewBox="0 0 110 92"><path d="M55 7 C38 8 33 25 20 44 C8 61 16 82 37 84 H73 C94 82 102 61 90 44 C77 25 72 8 55 7Z" fill="currentColor" stroke="#dbfff0" stroke-width="3"/><path d="M55 17 C46 24 38 43 30 55 Q25 70 41 72 H69 Q85 70 80 55 C72 43 64 24 55 17Z" fill="#17394a" opacity=".6"/><rect x="47" y="39" width="16" height="22" rx="5" fill="#dbfff0"/></svg></span>
             <span class="bag-icon" id="bagIcon" aria-hidden="true">
               <svg viewBox="0 0 110 92" role="img" aria-label="Bag valve mask">
                 <rect x="6" y="35" width="16" height="22" rx="3" fill="currentColor" opacity=".7"/>
@@ -163,7 +164,7 @@
           <button id="resetBtn" class="small-control danger-control" data-action="reset">↺ RESET</button>
           <button id="toggleMetronome" class="small-control metronome-button active" data-action="metro" aria-pressed="true">🎵 105 BPM ON</button>
         </div>
-        <div class="controller-vent" id="controllerVent" hidden><span>🫁 ET-TUBE</span> <strong data-bind="ventTime">6</strong><span id="controllerVentLabel">NEXT BREATH</span></div>
+        <div class="controller-vent" id="controllerVent" hidden><span id="ventMode">30:2</span> <strong data-bind="ventTime">6</strong><span id="controllerVentLabel">NEXT BREATH</span></div>
         <div id="pauseInfo" class="pause-info" hidden>
           <span>CHEST COMPRESSION INTERRUPTION</span>
           <strong id="pauseCountdown">10</strong><span>s left before warning</span>
@@ -190,7 +191,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.0.1 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.0.2 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
