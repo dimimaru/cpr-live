@@ -473,3 +473,54 @@ body.tv-mode .footer{display:none}
  body.tv-mode .monitor-main{grid-template-columns:1fr}
  body.tv-mode .stats{min-height:220px}
 }
+
+
+/* V0.7: TV-only alarm - flashing red edge for 10s, message for final 5s. */
+body:not(.tv-mode) #alarmOverlay{display:none!important;animation:none!important}
+body.tv-mode #alarmOverlay{display:none}
+body.tv-mode #alarmOverlay.alarm-on{
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+  border:clamp(8px,1.4vw,22px) solid #fa2447;
+  background:transparent;
+  animation:tv-alert-border 850ms ease-in-out infinite;
+}
+@keyframes tv-alert-border{
+  0%,100%{border-color:#ff254a;box-shadow:inset 0 0 25px rgba(255,30,68,.22)}
+  50%{border-color:#7d091e;box-shadow:inset 0 0 4px rgba(255,30,68,.05)}
+}
+body.tv-mode #alarmOverlay .alarm-content{display:none}
+body.tv-mode #alarmOverlay.message-on .alarm-content{
+  display:flex;
+  border:2px solid #ff7c90;
+  padding:clamp(14px,2.8vw,35px);
+  max-width:min(90vw,1100px);
+  background:rgba(48,0,14,.93);
+  box-shadow:0 10px 50px rgba(0,0,0,.5);
+}
+body.tv-mode #alarmOverlay.message-on .alarm-content strong{
+  font-size:clamp(22px,3vw,50px);overflow-wrap:anywhere
+}
+/* TV receives event data but never shows the Timeline panel. */
+body.tv-mode .timeline-section{display:none!important}
+/* Controller-only reporting controls. */
+.timeline-header{align-items:center;display:flex!important;justify-content:space-between;gap:12px}
+.timeline-header>div{min-width:0}
+.export-pdf-button{
+  border:1px solid #4d9bc7;background:#124b70;color:#effaff;
+  font-weight:800;border-radius:11px;padding:11px 16px;white-space:nowrap;
+  min-height:42px;letter-spacing:.02em;
+}
+.export-pdf-button:disabled{opacity:.4}
+.report-instructions{font-size:11px;color:#a3bbd2;margin:-5px 0 12px;line-height:1.5}
+@media(max-width:470px){
+  .timeline-header{flex-direction:row;align-items:center}
+  .export-pdf-button{font-size:11px;padding:9px 10px}
+}
+/* Fallback native print: show only the report document, never the live app. */
+@media print{
+  body.printing-cpr-report{background:white!important;color:#111!important}
+  body.printing-cpr-report .app,
+  body.printing-cpr-report #alarmOverlay{display:none!important}
+  body.printing-cpr-report .report-export{display:block!important;position:static!important;visibility:visible!important}
+}
