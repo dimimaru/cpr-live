@@ -207,3 +207,16 @@ Important: These UI cooldowns DO NOT govern actual medication or defibrillation 
 Guidelines:
 - https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines/adult-advanced-life-support
 - https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines/post-cardiac-arrest-care
+
+## V1.0.2 — Short feedback, medication colors and mask 30:2 coaching
+
+- SHOCK duplicate-log cooldown is 100 seconds (01:40). The button shows only the remaining time and still requires a new shockable rhythm event before the next Shock.
+- RESUME CPR has no spoken confirmation. During manual Pause, the RESUME button pulses on the Controller. Pause and Resume require no confirmation; Reset still does.
+- TV spoken feedback is concise. Shock preparation and drug cues remain separate from actual intervention logging.
+- Epinephrine: lock 3 minutes after the last documented dose; then enabled but neutral until 4:00, green from 4:00 to 4:39, red from 4:40 onward on Controller and TV. A new dose resets the timer and colors. Before the first documented dose, retain rhythm/shock-based emphasis; repeat-dose alerts are based on a real recorded dose only.
+- TV Epi speech: nonshockable 4:00, all rhythms 4:40 and 5:00. VF/pVT does not speak the 4:00 cue.
+- Before ET-tube: visual 30:2 coach with mask illustration, 30 compression beats at 105/min, followed by two one-second breath cues with a half-second release interval. Compression metronome is silent during breath phase. Manual Pause stops the coach; Resume starts a fresh 30-compression cycle.
+- After ET-tube: continuous compression metronome (when enabled) and independent silent bag cue every 6 seconds as before.
+- The 2-minute CPR clock continues independently. The mask coach is not a compression detector; CCF remains a manual Pause/Resume estimate and does not automatically measure or subtract actual mask ventilation interruptions.
+
+Simulation only. A browser cannot guarantee audio timing, reliable event delivery, or a clinically safe medication/defibrillation lock. Never use these UI locks to delay real care.
