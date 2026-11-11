@@ -735,11 +735,13 @@ async function handleAction(type,value) {
   if (type==="reset" && s.phase==="standby")return;
   if (["shock","epi","rhythm","peaWidth","etTube"].includes(type) && !["running","paused"].includes(s.phase))return;
   if(type==="shock"){
-    if(pendingShock)return;
-    if(s.lastShockAt!==null && Date.now()<s.lastShockAt+SHOCK_COOLDOWN_MS)return;
-    pendingShock=true; // Lock before first await to prevent concurrent rapid taps.
-    render();
+    if(pendingShock || !SHOCKABLE_RHYTHMS.has(s.rhythm) ||
+      s.lastRhythmEventId===null ||
+      s.lastRhythmEventId===s.lastShockRhythmEventId ||
+      actionCooldownRemaining(s,"shock",Date.now())>0)return;
   }
+  if(type!=="shock" && actionCooldownRemaining(s,type,Date.now())>0)return;
+  if(pendingActions.has(type))return;
   if (type==="peaWidth" && s.rhythm!=="PEA")return;
   if (type==="etTube" && s.advancedAirway)return;
   if (type==="metro")value=!s.metronomeOn;
@@ -757,6 +759,9 @@ async function handleAction(type,value) {
     value=next;
   }
   const e={id:DEVICE_ID+"-"+(++sequence),type,ts:Date.now(),seq:sequence,value};
+  pendingActions.add(type); // Lock synchronously before network await.
+  if(type==="shock")pendingShock=true;
+  render();
   try {
     await transmit("cpr-event",e);
     acceptEvent(e,true); // TV only speaks; controller stays silent.
@@ -764,10 +769,9 @@ async function handleAction(type,value) {
     alert("ส่งคำสั่งไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ: "+err.message);
     status("offline");
   } finally {
-    if(type==="shock"){
-      pendingShock=false;
-      render();
-    }
+    pendingActions.delete(type);
+    if(type==="shock")pendingShock=false;
+    render();
   }
 }
 function setupChannel() {
@@ -805,6 +809,7 @@ async function enterRoom(value) {
   }
   room=roomClean(value);
   pendingShock=false;
+  pendingActions.clear();
   messages=new Map();
   nearAlarmKey=cycleEndKey=epiAlarmKey="";
   if ("speechSynthesis" in window)speechSynthesis.cancel();
@@ -1063,7 +1068,7 @@ document.querySelectorAll("[data-action]").forEach(btn=>
         "\nRecorded hands-off: "+timeText(measurement.pauseMs)+
         "\nกรุณา Export PDF ก่อนล้างข้อมูลทั้งหมด"))return;
     }
-    if(action==="pause" && !confirm("ยืนยันเริ่มจับเวลาหยุดกดหน้าอก? เวลา CPR และยาไม่หยุดเดิน"))return;
+    // PAUSE CPR must be immediate: confirmation would add avoidable hands-off delay.
     if(action==="resume" && !confirm("ยืนยันกลับมากดหน้าอกต่อแล้ว?"))return;
     handleAction(action,btn.dataset.value);
   })
