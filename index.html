@@ -12,7 +12,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.7</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v0.8</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -26,6 +26,10 @@
     </div>
 
     <div class="audio-health" id="audioStatus" aria-live="off"></div>
+    <div id="pauseAlarmOverlay" class="pause-alarm-overlay" aria-hidden="true">
+      <strong>⚠️ CPR INTERRUPTION &gt; 10 SECONDS</strong>
+      <span>CONTINUE CHEST COMPRESSIONS NOW</span>
+    </div>
     <div id="alarmOverlay" class="alarm-overlay" aria-hidden="true">
       <div class="alarm-content">
         <span>⚠️ 2-MINUTE CPR CYCLE</span>
@@ -51,6 +55,17 @@
             <div class="clock" data-bind="cycle">02:00</div>
             <div class="small-display">TOTAL CASE TIME <span data-bind="elapsed">00:00</span></div>
             <div class="episode-display">ARREST EPISODE <strong data-bind="episode">0</strong></div>
+            <div class="ecg-panel" id="ecgPanel" aria-label="Illustrative ECG waveform; not patient data" hidden>
+              <div class="ecg-heading"><span>EXAMPLE ECG</span><strong id="ecgTitle">—</strong></div>
+              <svg class="ecg-monitor" viewBox="0 0 640 104" preserveAspectRatio="none" aria-hidden="true">
+                <defs><pattern id="ekgGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#24554c" stroke-width="0.6"/>
+                </pattern></defs>
+                <rect width="640" height="104" fill="url(#ekgGrid)"/>
+                <path id="ecgTrace" d="M0 52 H640" fill="none" stroke="#52efa3" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <div class="ecg-disclaimer">SIMULATED RHYTHM • NOT A REAL ECG</div>
+            </div>
           </div>
           <div class="stats">
             <div class="stat"><span>SHOCK</span><strong data-bind="shock">0</strong></div>
@@ -134,11 +149,16 @@
           </div>
         </div>
         <div class="remote-secondary">
-          <button id="pauseResumeBtn" class="small-control" data-action="pause">Ⅱ PAUSE</button>
+          <button id="pauseResumeBtn" class="small-control" data-action="pause">Ⅱ PAUSE CPR</button>
           <button id="resetBtn" class="small-control danger-control" data-action="reset">↺ RESET</button>
           <button id="toggleMetronome" class="small-control metronome-button active" data-action="metro" aria-pressed="true">🎵 105 BPM ON</button>
         </div>
         <div class="controller-vent" id="controllerVent" hidden><span>🫁 ET-TUBE</span> <strong data-bind="ventTime">6</strong><span id="controllerVentLabel">NEXT BREATH</span></div>
+        <div id="pauseInfo" class="pause-info" hidden>
+          <span>CHEST COMPRESSION INTERRUPTION</span>
+          <strong id="pauseCountdown">10</strong><span>s left before warning</span>
+        </div>
+        <div id="ccfSummary" class="ccf-summary" hidden>FINAL CCF <strong data-bind="ccf">—</strong> • Recorded pauses <strong data-bind="pauseTotal">00:00</strong></div>
         <p id="drugHint" class="drug-hint">เริ่ม CPR แล้วเลือกระบุ Rhythm</p>
         <div class="link-grid">
           <button id="copyTvLink" class="link-btn">📺 คัดลอกลิงก์สำหรับ TV</button>
@@ -158,7 +178,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V0.7 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V0.8 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
