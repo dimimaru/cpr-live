@@ -1,4 +1,4 @@
-// CPR Live v0.9 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.0 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -10,7 +10,19 @@ const DEVICE_ID = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
 const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2"]);
 const TWO_MIN = 120000;
 const FOUR_MIN = 240000;
-const SHOCK_COOLDOWN_MS = 110000; // 1 minute 50 seconds
+const SHOCK_COOLDOWN_MS = 110000; // 1 min 50 seconds for duplicate SHOCK logs
+const EPI_COOLDOWN_MS = 180000; // 3 minutes between documented Epi doses
+const ACTION_COOLDOWN_MS = 5000; // per-button anti-double-tap for other actions
+const FIVE_MIN = 300000;
+const EPI_PREWARN_MS = 10000;
+const SHOCKABLE_RHYTHMS = new Set(["VF","VT"]);
+function actionGroup(type){ return type; }
+function actionCooldownRemaining(s,type,now){
+  if(type==="shock")return s.lastShockAt===null?0:Math.max(0,s.lastShockAt+SHOCK_COOLDOWN_MS-now);
+  if(type==="epi")return s.lastEpiAt===null?0:Math.max(0,s.lastEpiAt+EPI_COOLDOWN_MS-now);
+  const last=s.lastActionAt[actionGroup(type)];
+  return last===undefined?0:Math.max(0,last+ACTION_COOLDOWN_MS-now);
+}
 const fmt = n => String(n).padStart(2,"0");
 const roomClean = v => String(v || "").toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,40) || "ER-DEMO-01";
 let room = roomClean(params.get("room") || cfg.defaultRoom);
@@ -20,7 +32,8 @@ let connected = false;
 let messages = new Map();
 let sequence = 0;
 let switchingRoom = false;
-let pendingShock = false; // Synchronous in-flight guard against rapid double clicks.
+let pendingShock = false; // Existing SHOCK in-flight guard.
+const pendingActions = new Set(); // Other actions locked before awaiting Supabase.
 
 // Audio is deliberately TV-only. Browsers require a gesture on each TV page
 // before sound and Web Speech are reliably permitted.
@@ -29,6 +42,7 @@ let audioContext = null;
 let nearAlarmKey = "";
 let cycleEndKey = "";
 let epiAlarmKey = "";
+let epiPreAlertKey = "";
 let interruptionAlarmKey = "";
 // Metronome is shared session state (the TV follows the Controller).
 let nextMetronomeBeat=null;
@@ -56,7 +70,10 @@ function blankState() {
     episodeStartAt:null,
     frozenCycleMs:0,
     epiAnchor:null,        // Time since CPR start or latest documented epinephrine.
-    shock:0,lastShockAt:null,epi:0,amioDoses:[],rhythm:"—",peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,metronomeOn:true,timeline:[]
+    shock:0,lastShockAt:null,lastEpiAt:null,epi:0,amioDoses:[],
+    rhythm:"—",lastRhythmEventId:null,lastShockRhythmEventId:null,
+    peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,
+    metronomeOn:true,lastActionAt:{},timeline:[]
   };
 }
 function chronological() {
@@ -65,11 +82,16 @@ function chronological() {
 }
 function line(state,e,label) {
   state.timeline.push({id:e.id,ts:e.ts,label});
+  if(e.type!=="shock" && e.type!=="epi" && e.type!=="reset"){
+    state.lastActionAt[actionGroup(e.type)]=e.ts;
+  }
 }
 function computeState() {
   const s = blankState();
   for (const e of chronological()) {
     const t = e.ts;
+    if(e.type!=="shock" && e.type!=="epi" && e.type!=="reset" &&
+      actionCooldownRemaining(s,e.type,t)>0)continue;
     if (e.type === "reset") {
       Object.assign(s,blankState());
     } else if (e.type === "start" && (s.phase === "standby" || s.phase === "rosc")) {
@@ -77,7 +99,7 @@ function computeState() {
       if (!recurrent) {
         s.sessionId=e.id;
         s.firstStartAt=t;
-        s.shock=0;s.lastShockAt=null;s.epi=0;s.amioDoses=[];s.etco2=null;s.advancedAirway=false;s.ventAnchor=null;s.timeline=[];
+        s.shock=0;s.lastShockAt=null;s.lastEpiAt=null;s.epi=0;s.amioDoses=[];s.etco2=null;s.advancedAirway=false;s.ventAnchor=null;s.timeline=[];
       }
       s.episode++;
       s.phase="running";
@@ -87,6 +109,8 @@ function computeState() {
       s.pausedAt=null;
       s.pauseId=null;
       s.rhythm="—";
+      s.lastRhythmEventId=null;
+      s.lastShockRhythmEventId=null;
       s.peaWidth=null;
       if(s.advancedAirway)s.ventAnchor=t; // Re-arrest: start a new 6-second breath cycle.
       // When no epinephrine has been recorded, the first/next arrest starts the
@@ -119,15 +143,21 @@ function computeState() {
       // Shared event-source guard: only the earliest shock in each 110s window
       // is counted, even if several controllers broadcast duplicate clicks.
       // This is UI/logging protection, not an electrical defibrillator lockout.
-      if(s.lastShockAt===null || t-s.lastShockAt>=SHOCK_COOLDOWN_MS){
+      if((s.lastShockAt===null || t-s.lastShockAt>=SHOCK_COOLDOWN_MS) &&
+        SHOCKABLE_RHYTHMS.has(s.rhythm) && s.lastRhythmEventId!==null &&
+        s.lastRhythmEventId!==s.lastShockRhythmEventId){
         s.shock++;
         s.lastShockAt=t;
+        s.lastShockRhythmEventId=s.lastRhythmEventId;
         line(s,e,"SHOCK #"+s.shock);
       }
     } else if (["running","paused"].includes(s.phase) && e.type === "epi") {
-      s.epi++;
-      s.epiAnchor=t;
-      line(s,e,"EPINEPHRINE #"+s.epi);
+      if(s.lastEpiAt===null || t-s.lastEpiAt>=EPI_COOLDOWN_MS){
+        s.epi++;
+        s.epiAnchor=t;
+        s.lastEpiAt=t;
+        line(s,e,"EPINEPHRINE #"+s.epi);
+      }
     } else if (["running","paused"].includes(s.phase) && e.type === "amio" &&
       (e.value===300||e.value===150) &&
       s.amioDoses.length<2 && e.value===(s.amioDoses.length===0?300:150)) {
@@ -136,6 +166,7 @@ function computeState() {
     } else if (["running","paused"].includes(s.phase) && e.type === "rhythm" &&
       ["VF","VT","PEA","Asystole"].includes(e.value)) {
       s.rhythm=e.value;
+      s.lastRhythmEventId=e.id;
       s.peaWidth=null;
       line(s,e,"RHYTHM: "+s.rhythm);
     } else if (["running","paused"].includes(s.phase) && e.type === "peaWidth" &&
@@ -149,6 +180,7 @@ function computeState() {
     } else if (e.type==="metro" && typeof e.value==="boolean") {
       // Sync metronome setting silently: no Timeline entry or spoken feedback.
       s.metronomeOn=e.value;
+      s.lastActionAt.metro=t;
     } else if (["running","paused","rosc"].includes(s.phase) && e.type === "etco2" &&
       s.advancedAirway && Number.isInteger(e.value) && e.value>=0 && e.value<=150) {
       s.etco2=e.value;
