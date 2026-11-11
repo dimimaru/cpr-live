@@ -27,6 +27,7 @@ let audioContext = null;
 let nearAlarmKey = "";
 let cycleEndKey = "";
 let epiAlarmKey = "";
+let interruptionAlarmKey = "";
 // Metronome is shared session state (the TV follows the Controller).
 let nextMetronomeBeat=null;
 let currentMetronomeEpisode=null;
@@ -229,8 +230,8 @@ function announceEvent(e,s) {
   if (!audioReady || !tvMode) return;
   const spoken={
     start:s.episode>1?"เริ่มซีพีอาร์อีกครั้ง ครั้งที่ "+s.episode+" กรุณาบันทึกจังหวะหัวใจ":"เริ่มซีพีอาร์ กรุณาบันทึกจังหวะหัวใจทันที โดยไม่ต้องรอหยุดเวลา",
-    pause:"ยืนยันพักตัวจับเวลา ซีพีอาร์",
-    resume:"ยืนยันเริ่มนับเวลา ซีพีอาร์ ต่อ",
+    pause:"เริ่มนับช่วงหยุดกดหน้าอก ให้กลับมากดหน้าอกภายในสิบวินาที",
+    resume:"กลับมากดหน้าอกต่อแล้ว",
     reset:"ยืนยันรีเซ็ต กลับสู่หน้ารอ",
     shock:"บันทึกช็อกครั้งที่ "+s.shock+" "+shockAdvice(s),
     epi:"บันทึกให้ยา อิพิเนฟริน ครั้งที่ "+s.epi+" เริ่มนับเวลายาใหม่",
@@ -373,6 +374,66 @@ function checkAlarms(s,clock) {
   // two interrupted speech utterances.
   if (announcements.length) soundNotice(announcements.join(" และ "),true);
 }
+// Purely illustrative trace sketches, never monitor data or ECG diagnostic references.
+function exampleEcgPath(rhythm,width){
+  const parts=["M0 52"];
+  if(rhythm==="Asystole"){
+    for(let x=0;x<=640;x+=8)parts.push("L"+x+" "+(52+1.5*Math.sin(x/29)+.5*Math.sin(x/7)).toFixed(1));
+  }else if(rhythm==="VF"){
+    for(let x=0;x<=640;x+=5){
+      const y=52+(15+10*Math.sin(x*.023)**2)*Math.sin(x*.14)+12*Math.sin(x*.32)+6*Math.sin(x*.46);
+      parts.push("L"+x+" "+Math.min(98,Math.max(5,y)).toFixed(1));
+    }
+  }else if(rhythm==="VT"){
+    for(let x=0;x<640;x+=114)parts.push("L"+(x+8)+" 54","Q"+(x+24)+" 54 "+(x+32)+" 29",
+      "Q"+(x+45)+" 4 "+(x+59)+" 16","Q"+(x+76)+" 28 "+(x+87)+" 81",
+      "Q"+(x+99)+" 98 "+(x+110)+" 55","L"+(x+114)+" 52");
+  }else if(rhythm==="PEA"&&width==="Narrow"){
+    for(let x=0;x<640;x+=142)parts.push("L"+(x+12)+" 52","Q"+(x+22)+" 40 "+(x+32)+" 52",
+      "L"+(x+43)+" 52","L"+(x+50)+" 57","L"+(x+56)+" 11","L"+(x+62)+" 85",
+      "L"+(x+69)+" 52","L"+(x+87)+" 52","Q"+(x+102)+" 33 "+(x+119)+" 52","L"+(x+142)+" 52");
+  }else if(rhythm==="PEA"&&width==="Wide"){
+    for(let x=0;x<640;x+=150)parts.push("L"+(x+16)+" 52","Q"+(x+27)+" 42 "+(x+37)+" 52",
+      "L"+(x+48)+" 52","C"+(x+65)+" 50 "+(x+66)+" 15 "+(x+84)+" 16",
+      "C"+(x+101)+" 16 "+(x+106)+" 86 "+(x+123)+" 85",
+      "Q"+(x+132)+" 78 "+(x+139)+" 52","L"+(x+150)+" 52");
+  }else parts.push("H640");
+  return parts.join(" ");
+}
+function renderECG(s){
+  const panel=document.getElementById("ecgPanel");
+  if(!tvMode||s.rhythm==="—"){panel.hidden=true;return;}
+  panel.hidden=false;
+  const name=s.rhythm==="VT"?"pVT":s.rhythm==="PEA"?
+    (s.peaWidth?"PEA — "+s.peaWidth.toUpperCase()+" QRS":"PEA — SELECT QRS"):s.rhythm.toUpperCase();
+  const title=document.getElementById("ecgTitle");
+  if(title.textContent!==name)title.textContent=name;
+  const trace=document.getElementById("ecgTrace");
+  const path=exampleEcgPath(s.rhythm,s.peaWidth);
+  if(trace.getAttribute("d")!==path)trace.setAttribute("d",path);
+  trace.setAttribute("stroke",["VF","VT"].includes(s.rhythm)?"#ffbc72":
+    s.rhythm==="Asystole"?"#86b7a1":"#52efa3");
+}
+function renderInterruption(s,clock){
+  const paused=s.phase==="paused"&&s.pausedAt!==null;
+  const mobile=document.getElementById("pauseInfo");
+  mobile.hidden=!paused;
+  if(paused){
+    const remaining=Math.max(0,Math.ceil(clock.pauseRemainingMs/1000));
+    document.getElementById("pauseCountdown").textContent=String(remaining);
+    mobile.classList.toggle("pause-overrun",remaining===0);
+    const text=mobile.querySelector("span:last-child");
+    if(text)text.textContent=remaining===0?"OVER 10s — CONTINUE CPR":"s left before warning";
+  }
+  const overlay=document.getElementById("pauseAlarmOverlay");
+  const over=tvMode&&connected&&paused&&clock.currentPauseMs>=10000;
+  overlay.classList.toggle("active",over);
+  if(over&&audioReady&&interruptionAlarmKey!==s.pauseId){
+    interruptionAlarmKey=s.pauseId;
+    soundNotice("หยุดกดหน้าอกเกินสิบวินาที ให้กลับมากดหน้าอกต่อทันที",true);
+  }
+  document.getElementById("ccfSummary").hidden=!(s.phase==="rosc"&&clock.ccf!==null);
+}
 function renderVentilation(s,clock) {
   const show=s.advancedAirway && ["running","paused"].includes(s.phase);
   const tv=document.getElementById("ventilator");
@@ -418,7 +479,8 @@ function render() {
       s.phase==="paused"?"PAUSED":clock.epiMs>=FOUR_MIN?"ครบ 4 นาที — ตรวจสอบ Protocol":
       "เป้าหมายแจ้งเตือนที่ 04:00",
     shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm,etco2:s.etco2===null?"—":s.etco2,
-    episode:s.episode,room
+    episode:s.episode,ccf:clock.ccf===null?"—":clock.ccf.toFixed(1)+"%",
+    pauseTotal:timeText(clock.pauseMs),room
   };
   for (const [key,val] of Object.entries(values)) {
     document.querySelectorAll('[data-bind="'+key+'"]').forEach(n=>{
@@ -464,7 +526,7 @@ function render() {
   const pauseResume=document.getElementById("pauseResumeBtn");
   const resume=s.phase==="paused";
   pauseResume.dataset.action=resume?"resume":"pause";
-  pauseResume.textContent=resume?"▶ RESUME":"Ⅱ PAUSE";
+  pauseResume.textContent=resume?"▶ RESUME CPR":"Ⅱ PAUSE CPR";
   const metro=document.getElementById("toggleMetronome");
   metro.classList.toggle("active",s.metronomeOn);
   metro.setAttribute("aria-pressed",String(s.metronomeOn));
@@ -497,9 +559,11 @@ function render() {
   hint.textContent=!connected?"OFFLINE — ข้อมูล/เสียงเตือนอาจไม่ล่าสุด":
     s.phase==="standby"?"ONLINE — รอ Start CPR จาก Controller":
     s.phase==="rosc"?"ONLINE — ROSC • TOTAL CASE TIME STILL RUNNING":
-    s.phase==="paused"?"ONLINE — CPR TIMER PAUSED":"ONLINE — REALTIME CPR SESSION";
+    s.phase==="paused"?"ONLINE — COMPRESSIONS INTERRUPTED • CLOCK CONTINUES":"ONLINE — REALTIME CPR SESSION";
   renderAirwayAndRhythm(s);
   renderVentilation(s,clock);
+  renderECG(s);
+  renderInterruption(s,clock);
   checkAlarms(s,clock);
   if(!tvMode){
     document.getElementById("exportPdfBtn").disabled=s.timeline.length===0;
