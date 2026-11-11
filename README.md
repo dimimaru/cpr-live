@@ -91,3 +91,16 @@ Public channel information and room code can be used by anyone who knows them.
 Never transmit patient-identifiable data. If all devices disconnect simultaneously,
 state can be lost. TV browser sleep, network loss, autoplay policy and delayed JS
 timers make this unsuitable as a resuscitation timer/coach during clinical care.
+
+
+## V0.6 — TV Landscape Update
+
+- TV now fills the entire **web page viewport** and uses a compact header (CPR status/Connected).
+- Shock and Epinephrine counts are deliberately small to give **LAST RHYTHM** more room.
+- Reflowed TV metrics into a 6-column grid: Shock 1 / Epinephrine 1 / Last Rhythm 4; Epinephrine Timer 3 / CO₂ 3.
+- Reduced font sizes with min-width:0, overflow protection and landscape/low-height CSS to prevent numbers and labels overlapping on common 720p/1080p TV browsers.
+- Metronome ON/OFF from Controller still synchronizes silently; no spoken announcement or extra Timeline record.
+- On TV page load, code attempts Fullscreen; if browser blocks it, a **tap/click on the TV page** can trigger browser Fullscreen API (when supported).
+- For an extended Windows monitor/TV, **F11 on Chrome/Edge** or browser kiosk mode is still needed if browser blocks scripted fullscreen. Browser URL/address bars cannot be forcibly hidden by the site without an allowed user gesture.
+
+**After deployment:** hard Refresh both Controller and TV. Compare on 16:9 screen; verify no cropping at lower resolutions (1366×768 and 1920×1080), including while ET-tube ventilation and high-quality CPR warnings are active.
