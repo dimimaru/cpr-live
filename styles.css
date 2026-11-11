@@ -524,3 +524,16 @@ body.tv-mode .timeline-section{display:none!important}
   body.printing-cpr-report #alarmOverlay{display:none!important}
   body.printing-cpr-report .report-export{display:block!important;position:static!important;visibility:visible!important}
 }
+
+
+/* Keep the PDF document visible in native Print-to-PDF fallback. */
+@media print{
+  body.printing-cpr-report .report-export-mount{
+    display:block!important;position:static!important;left:auto!important;
+    top:auto!important;width:190mm!important;z-index:auto!important;
+  }
+  body.printing-cpr-report .report-export{
+    display:block!important;position:static!important;left:auto!important;
+    top:auto!important;width:190mm!important;
+  }
+}
