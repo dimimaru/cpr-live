@@ -582,15 +582,19 @@ function render() {
       (action==="rosc" && !active) ||
       (["shock","epi","rhythm"].includes(action) && !active) ||
       (action==="peaWidth" && (!active || s.rhythm!=="PEA")) ||
-      (action==="etTube" && (!active || s.advancedAirway));
+      (action==="etTube" && (!active || s.advancedAirway)) ||
+      (action!=="shock" && actionCooldownRemaining(s,action,Date.now())>0) ||
+      pendingActions.has(action);
   }
   const shockButton=document.getElementById("shockButton");
   const shockHint=document.getElementById("shockCooldownHint");
   const shockRemaining=s.lastShockAt===null?0:
     Math.min(SHOCK_COOLDOWN_MS,Math.max(0,s.lastShockAt+SHOCK_COOLDOWN_MS-Date.now()));
   const shockLocked=shockRemaining>0;
-  shockButton.disabled=!connected || !["running","paused"].includes(s.phase) ||
-    shockLocked || pendingShock;
+  const freshShockable=SHOCKABLE_RHYTHMS.has(s.rhythm) &&
+    s.lastRhythmEventId!==null && s.lastRhythmEventId!==s.lastShockRhythmEventId;
+  const arrestActive=["running","paused"].includes(s.phase);
+  shockButton.disabled=!connected || !arrestActive || shockLocked || pendingShock || !freshShockable;
   shockButton.classList.toggle("cooldown-locked",shockLocked || pendingShock);
   if(shockLocked){
     const seconds=Math.ceil(shockRemaining/1000);
@@ -602,33 +606,59 @@ function render() {
     shockButton.textContent="⚡ SAVING SHOCK…";
     shockHint.textContent="กำลังบันทึก Shock";
     shockHint.hidden=false;
+  }else if(arrestActive && !freshShockable){
+    shockButton.textContent="⚡ SHOCK";
+    shockHint.textContent=SHOCKABLE_RHYTHMS.has(s.rhythm)?
+      "บันทึก VF / pVT อีกครั้งก่อน Shock ทุกครั้ง":
+      "ต้องเลือกและยืนยัน Rhythm เป็น VF หรือ pVT ก่อน Shock";
+    shockHint.hidden=false;
   }else{
-    shockButton.textContent="⚡ SHOCK +1";
+    shockButton.textContent="⚡ SHOCK";
     shockHint.hidden=true;
   }
   const pauseResume=document.getElementById("pauseResumeBtn");
   const resume=s.phase==="paused";
   pauseResume.dataset.action=resume?"resume":"pause";
   pauseResume.textContent=resume?"▶ RESUME CPR":"Ⅱ PAUSE CPR";
+  pauseResume.disabled=!connected ||
+    !["running","paused"].includes(s.phase) ||
+    actionCooldownRemaining(s,resume?"resume":"pause",Date.now())>0 ||
+    pendingActions.has(resume?"resume":"pause");
   const metro=document.getElementById("toggleMetronome");
   metro.classList.toggle("active",s.metronomeOn);
   metro.setAttribute("aria-pressed",String(s.metronomeOn));
   metro.textContent="🎵 105 BPM "+(s.metronomeOn?"ON":"OFF");
   const epiButton=document.getElementById("epiButton");
-  epiButton.classList.toggle("epi-highlight",cue.epiReady);
-  epiButton.classList.toggle("epi-muted",!cue.epiReady);
+  const epiLockMs=actionCooldownRemaining(s,"epi",Date.now());
+  const epiLocked=epiLockMs>0;
+  epiButton.disabled=!connected || !arrestActive || epiLocked || pendingActions.has("epi");
+  epiButton.classList.toggle("epi-highlight",cue.epiReady && !epiLocked);
+  epiButton.classList.toggle("epi-muted",!cue.epiReady || epiLocked);
+  epiButton.classList.toggle("epi-locked",epiLocked);
+  const epiHint=document.getElementById("epiLockHint");
+  if(epiLocked){
+    const seconds=Math.ceil(epiLockMs/1000);
+    const txt=fmt(Math.floor(seconds/60))+":"+fmt(seconds%60);
+    epiButton.textContent="❤️ EPINEPHRINE · "+txt;
+    epiHint.textContent="LOCKED "+txt+" (3 MIN BETWEEN LOGS)";
+    epiHint.hidden=false;
+  }else{
+    epiButton.textContent="❤️ EPINEPHRINE";
+    epiHint.hidden=true;
+  }
   const amioButton=document.getElementById("amioButton");
   const amio300=cue.amioCount===0;
-  amioButton.textContent=amio300?"💊 AMIODARONE 300 mg":"💊 AMIODARONE 150 mg";
+  amioButton.textContent=amio300?"💉 AMIODARONE 300 mg":"💉 AMIODARONE 150 mg";
   const amioReady=cue.shockable && s.shock >= (amio300?3:5);
   const amioPrep=cue.shockable && ((amio300 && s.shock===2) ||
     (!amio300 && s.shock>=4 && s.shock<5));
-  if(!amio300 && amioPrep)amioButton.textContent="💊 AMIODARONE 150 mg · เตรียม";
+  if(!amio300 && amioPrep)amioButton.textContent="💉 AMIODARONE 150 mg · เตรียม";
   amioButton.classList.toggle("amio-highlight",amioReady);
   amioButton.classList.toggle("amio-prepare",amioPrep);
   amioButton.classList.toggle("amio-muted",!amioReady && !amioPrep);
   amioButton.disabled=!connected || !["running","paused"].includes(s.phase) ||
-    !cue.shockable || cue.amioCount>=2 || s.shock < (amio300?3:4);
+    !cue.shockable || cue.amioCount>=2 || s.shock < (amio300?3:4) ||
+    actionCooldownRemaining(s,"amio",Date.now())>0 || pendingActions.has("amio");
   document.getElementById("clinicalCue").textContent=cue.cue+
     (s.phase==="rosc" && clock.ccf!==null?" • DOCUMENTED CCF "+clock.ccf.toFixed(1)+"%":"");
   document.getElementById("drugHint").textContent=cue.cue+
