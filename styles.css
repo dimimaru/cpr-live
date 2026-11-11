@@ -537,3 +537,84 @@ body.tv-mode .timeline-section{display:none!important}
     top:auto!important;width:190mm!important;
   }
 }
+
+
+/* CPR Live V0.8 — ECG illustrations, interruption counter and final CCF. */
+body:not(.tv-mode) #ecgPanel{display:none!important}
+body.tv-mode .ecg-panel{
+  flex:0 0 auto;
+  display:flex;flex-direction:column;
+  width:min(100%,590px);
+  min-width:0;max-height:clamp(62px,13vh,112px);
+  padding:5px 7px 4px;
+  margin-top:clamp(3px,.6vh,8px);
+  border-radius:9px;border:1px solid #275748;
+  background:#081d20;overflow:hidden;
+}
+body.tv-mode .ecg-heading{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;min-width:0;padding:0 4px;
+  font-size:clamp(9px,.8vw,12px);color:#94c2b2;
+}
+body.tv-mode .ecg-heading strong{
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-size:clamp(10px,1.12vw,17px);color:#caffdf;
+}
+body.tv-mode .ecg-monitor{display:block;width:100%;height:clamp(37px,7vh,72px);min-height:0;flex:1}
+body.tv-mode .ecg-disclaimer{
+  text-align:center;color:#82ac98;font-size:clamp(8px,.65vw,10px);
+  white-space:nowrap;letter-spacing:.025em;
+}
+body.tv-mode .timer-stack{gap:2px}
+body:not(.tv-mode) #pauseAlarmOverlay{display:none!important}
+.pause-alarm-overlay{display:none;pointer-events:none}
+body.tv-mode .pause-alarm-overlay.active{
+  position:fixed;inset:0;z-index:109;
+  display:flex;flex-direction:column;gap:10px;
+  align-items:center;justify-content:center;
+  background:rgba(64,0,12,.26);
+  border:clamp(10px,1.4vw,21px) solid #fa304f;
+  animation:tv-interruption-alert 650ms ease-in-out infinite;
+  text-align:center;padding:22px;pointer-events:none;
+}
+body.tv-mode .pause-alarm-overlay.active strong{
+  max-width:100%;background:rgba(74,4,17,.91);
+  padding:14px 24px;border-radius:10px;
+  border:2px solid #ff8798;color:#fff;
+  font-size:clamp(23px,3vw,46px);
+  line-height:1.2;
+}
+body.tv-mode .pause-alarm-overlay.active span{
+  background:rgba(58,2,13,.93);padding:10px 18px;
+  border-radius:8px;color:#ffe8ea;
+  font-size:clamp(16px,2.2vw,30px);font-weight:800;
+}
+@keyframes tv-interruption-alert{
+  50%{border-color:#8b1325;background:rgba(64,0,12,.10)}
+}
+.pause-info{
+  display:flex;align-items:center;flex-wrap:wrap;
+  gap:5px;margin-top:8px;border:1px solid #dd855e;
+  border-radius:8px;padding:6px 9px;background:#3a2b2c;
+  color:#ffe0c4;font-weight:700;font-size:11px;
+}
+.pause-info strong{
+  color:#fff;font-variant-numeric:tabular-nums;font-size:17px;
+  line-height:1.1;padding:0 3px;
+}
+.pause-info.pause-overrun{background:#671e29;border-color:#ff5c70;color:#fff}
+.ccf-summary{
+  margin-top:9px;font-size:12px;line-height:1.35;
+  color:#cce3ef;border-left:3px solid #50caa3;
+  padding:8px 11px;background:#15394a;border-radius:7px;
+}
+.ccf-summary strong{color:#fff;font-size:13px;font-variant-numeric:tabular-nums}
+@media(max-height:680px) and (min-aspect-ratio:1/1){
+  body.tv-mode .ecg-panel{max-height:75px;margin-top:2px;padding:2px 6px}
+  body.tv-mode .ecg-monitor{height:37px}
+  body.tv-mode .ecg-disclaimer{font-size:8px}
+  body.tv-mode .clock{font-size:clamp(48px,8vw,125px)}
+}
+@media(prefers-reduced-motion:reduce){
+ body.tv-mode .pause-alarm-overlay.active{animation:none}
+}
