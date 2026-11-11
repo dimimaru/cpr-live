@@ -1,4 +1,4 @@
-// CPR Live v1.0 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.0.2 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -10,11 +10,11 @@ const DEVICE_ID = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
 const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2"]);
 const TWO_MIN = 120000;
 const FOUR_MIN = 240000;
-const SHOCK_COOLDOWN_MS = 110000; // 1 min 50 seconds for duplicate SHOCK logs
+const SHOCK_COOLDOWN_MS = 100000; // 1 min 40 seconds for duplicate SHOCK logs
 const EPI_COOLDOWN_MS = 180000; // 3 minutes between documented Epi doses
 const ACTION_COOLDOWN_MS = 5000; // per-button anti-double-tap for other actions
 const FIVE_MIN = 300000;
-const EPI_PREWARN_MS = 10000;
+const EPI_PREWARN_MS = 20000;
 const SHOCKABLE_RHYTHMS = new Set(["VF","VT"]);
 function actionGroup(type){ return type; }
 function actionCooldownRemaining(s,type,now){
@@ -47,8 +47,13 @@ let interruptionAlarmKey = "";
 // Metronome is shared session state (the TV follows the Controller).
 let nextMetronomeBeat=null;
 let currentMetronomeEpisode=null;
+let lastCoachBeatKey="";
 const METRONOME_BPM=105;
 const METRONOME_INTERVAL=60/METRONOME_BPM;
+const COMPRESSION_BEAT_MS=60000/METRONOME_BPM;
+const THIRTY_BEATS_MS=30*COMPRESSION_BEAT_MS;
+const TWO_BREATHS_MS=2500; // 1 s breath, 0.5 s release, 1 s breath
+const MASK_CYCLE_MS=THIRTY_BEATS_MS+TWO_BREATHS_MS;
 
 document.body.classList.toggle("tv-mode",tvMode);
 document.getElementById("timelineSection").hidden=tvMode;
@@ -72,7 +77,7 @@ function blankState() {
     epiAnchor:null,        // Time since CPR start or latest documented epinephrine.
     shock:0,lastShockAt:null,lastEpiAt:null,epi:0,amioDoses:[],
     rhythm:"—",lastRhythmEventId:null,lastShockRhythmEventId:null,
-    peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,
+    peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,coachAnchor:null,
     metronomeOn:true,lastActionAt:{},timeline:[]
   };
 }
@@ -105,6 +110,7 @@ function computeState() {
       s.phase="running";
       s.cycleAnchor=t;
       s.episodeStartAt=t;
+      s.coachAnchor=t;
       s.frozenCycleMs=0;
       s.pausedAt=null;
       s.pauseId=null;
@@ -129,6 +135,7 @@ function computeState() {
       s.pausedAt=null;
       s.pauseId=null;
       s.phase="running";
+      s.coachAnchor=t;
       line(s,e,"RESUME COMPRESSIONS — interruption "+timeText(interruption));
     } else if (e.type === "rosc" && ["running","paused"].includes(s.phase)) {
       if (s.pausedAt!==null) s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
@@ -140,7 +147,7 @@ function computeState() {
       s.phase="rosc";
       line(s,e,"ROSC — CPR STOPPED");
     } else if (["running","paused"].includes(s.phase) && e.type === "shock") {
-      // Shared event-source guard: only the earliest shock in each 110s window
+      // Shared event-source guard: only the earliest shock in each 100s window
       // is counted, even if several controllers broadcast duplicate clicks.
       // This is UI/logging protection, not an electrical defibrillator lockout.
       if((s.lastShockAt===null || t-s.lastShockAt>=SHOCK_COOLDOWN_MS) &&
@@ -258,36 +265,46 @@ function soundNotice(text,urgent=false) {
   speak(text,urgent);
 }
 function shockAdvice(s) {
-  if(!["VF","VT"].includes(s.rhythm))return "";
-  if(s.shock===1)return "ช็อกครั้งแรก ให้ต่อซีพีอาร์ทันที";
-  if(s.shock===2)return "ช็อกครั้งที่สอง เตรียมอามิโอดาโรน สามร้อยมิลลิกรัม สำหรับหลังช็อกครั้งที่สาม และประเมินการให้อิพิเนฟรินตามแนวทาง เอ เอช เอ";
-  if(s.shock===3)return "ช็อกครั้งที่สาม พิจารณาอามิโอดาโรน สามร้อยมิลลิกรัม หากยังเป็น วีเอฟ หรือ พีวีที";
-  if(s.shock===4)return "ช็อกครั้งที่สี่ เตรียมอามิโอดาโรนหนึ่งร้อยห้าสิบมิลลิกรัม ขนาดที่สอง โดยแนวทาง อี อาร์ ซี ระบุให้พิจารณาหลังช็อกครั้งที่ห้า";
-  if(s.shock===5)return "ช็อกครั้งที่ห้า พิจารณาอามิโอดาโรนขนาดที่สอง หนึ่งร้อยห้าสิบมิลลิกรัม ตามแนวทางที่ทีมเลือกใช้";
-  return "ช็อกครั้งที่ "+s.shock+" ให้ต่อซีพีอาร์และประเมินจังหวะตามขั้นตอน";
+  if(s.shock===2)return "เตรียมอามิโอดาโรน สามร้อยมิลลิกรัม";
+  if(s.shock===3)return "พิจารณาอามิโอดาโรน สามร้อยมิลลิกรัม";
+  if(s.shock===4)return "เตรียมอามิโอดาโรน หนึ่งร้อยห้าสิบมิลลิกรัม";
+  if(s.shock===5)return "พิจารณาอามิโอดาโรน หนึ่งร้อยห้าสิบมิลลิกรัม";
+  return "";
 }
 function announceEvent(e,s) {
-  if (!audioReady || !tvMode) return;
+  if(!audioReady || !tvMode || e.type==="resume" || e.type==="metro")return;
   const spoken={
-    start:s.episode>1?"เริ่มซีพีอาร์อีกครั้ง ครั้งที่ "+s.episode+" กรุณาบันทึกจังหวะหัวใจ":"เริ่มซีพีอาร์ กรุณาบันทึกจังหวะหัวใจทันที โดยไม่ต้องรอหยุดเวลา",
-    pause:"บันทึกหยุดกดหน้าอก เริ่มนับเวลาหยุด ให้กลับมากดหน้าอกภายในสิบวินาที",
-    resume:"กลับมากดหน้าอกต่อแล้ว",
-    reset:"ยืนยันรีเซ็ต กลับสู่หน้ารอ",
-    shock:"บันทึกช็อกครั้งที่ "+s.shock+" "+shockAdvice(s),
-    epi:"บันทึกให้ยา อิพิเนฟริน ครั้งที่ "+s.epi+" เริ่มนับเวลายาใหม่",
-    amio:"บันทึกให้ยา อามิโอดาโรน "+e.value+" มิลลิกรัม",
-    rhythm:e.value==="VF"?"บันทึกจังหวะ วีเอฟ ช็อกได้":
-      e.value==="VT"?"บันทึกจังหวะ พัลส์เลส วีที ช็อกได้":
-      e.value==="PEA"?"บันทึกจังหวะ พีอีเอ เลือกแนโรหรือไวด์คิวอาร์เอส และพิจารณาทำอัลตราซาวด์ข้างเตียงเพื่อหาสาเหตุ ห้ามหยุดกดหน้าอกนาน":
-      "บันทึก แอสซิสโตลี ตรวจสอบแฟลตไลน์โปรโตคอล เช็กสายต่อ เกน และยืนยันจากสองลีด โดยไม่ชะลอการกดหน้าอก",
-    peaWidth:e.value==="Wide"?"พีอีเอ ไวด์คิวอาร์เอส พิจารณาอัลตราซาวด์ข้างเตียงเพื่อค้นหาสาเหตุที่แก้ไขได้":
-      "พีอีเอ แนโรคิวอาร์เอส พิจารณาอัลตราซาวด์ข้างเตียงเพื่อค้นหาสาเหตุที่แก้ไขได้",
-    etTube:"บันทึก ใส่ท่อช่วยหายใจแล้ว เริ่มตัวช่วยจังหวะช่วยหายใจทุกหกวินาที",
-    rosc:"บันทึก อาร์ โอ เอส ซี ได้ชีพจรกลับมา หยุดรอบซีพีอาร์",
-    etco2:"บันทึก ซีโอทู "+e.value+" มิลลิเมตรปรอท"+
-      (e.value<10?" ซีโอทูต่ำกว่าสิบ ตรวจสอบคุณภาพการกดหน้าอก และปัจจัยอื่นที่มีผลต่อซีโอทู":"")
+    start:"เริ่มซีพีอาร์ บันทึกริทึม",
+    pause:"พักกดหน้าอก",
+    reset:"รีเซ็ต",
+    shock:"ช็อกครั้งที่ "+s.shock+" "+shockAdvice(s),
+    epi:"อิพิเนฟริน ครั้งที่ "+s.epi,
+    amio:"อามิโอดาโรน "+e.value+" มิลลิกรัม",
+    rhythm:e.value==="VF"?"วีเอฟ":e.value==="VT"?"พีวีที":
+      e.value==="PEA"?"พีอีเอ เลือกคิวอาร์เอส ทำพีโอคัส":"แอสซิสโตลี แฟลตไลน์โปรโตคอล",
+    peaWidth:e.value==="Wide"?"ไวด์คิวอาร์เอส":"แนโรคิวอาร์เอส",
+    etTube:"ใส่ท่อแล้ว",
+    rosc:"อาร์โอเอสซี ตรวจอีเคจี เอกซเรย์ปอด วัดไวทัลไซน์ ประเมินจีซีเอส",
+    etco2:"ซีโอทู "+e.value+(e.value<10?" ตรวจคุณภาพซีพีอาร์":"")
   };
-  soundNotice(spoken[e.type]||e.type,e.type==="rosc"||e.type==="start"||e.type==="etco2"&&e.value<10);
+  if(spoken[e.type])soundNotice(spoken[e.type],e.type==="rosc"||e.type==="start"||(e.type==="etco2"&&e.value<10));
+}
+// 30:2 is a visual/audio timing coach, not a compression detector.
+function maskCoach(s,now){
+  const elapsed=Math.max(0,now-(s.coachAnchor??s.episodeStartAt??now));
+  const round=Math.floor(elapsed/MASK_CYCLE_MS);
+  const position=elapsed-round*MASK_CYCLE_MS;
+  if(position<THIRTY_BEATS_MS){
+    return {round,position,breath:0,count:Math.min(30,Math.floor(position/COMPRESSION_BEAT_MS)+1),squeeze:false};
+  }
+  const b=position-THIRTY_BEATS_MS;
+  return {round,position,breath:b<1500?1:2,count:30,squeeze:b<1000||b>=1500};
+}
+function epiColor(s,clock){
+  if(!["running","paused"].includes(s.phase))return "neutral";
+  if(s.lastEpiAt===null)return medicationCue(s).epiReady?"green":"neutral";
+  if(clock.epiMs>=FIVE_MIN-EPI_PREWARN_MS)return "red";
+  return clock.epiMs>=FOUR_MIN?"green":"neutral";
 }
 function playMetronomeBeat(when) {
   if (!audioContext || audioContext.state!=="running")return;
@@ -307,8 +324,29 @@ function playMetronomeBeat(when) {
 function updateMetronome(s) {
   const active=audioReady && tvMode && s.metronomeOn && connected &&
     s.phase==="running" && audioContext && audioContext.state==="running";
-  if(!active){nextMetronomeBeat=null;currentMetronomeEpisode=null;return;}
-  const id=room+"|"+s.sessionId+"|"+s.episode;
+  if(!active){nextMetronomeBeat=null;currentMetronomeEpisode=null;lastCoachBeatKey="";return;}
+  const id=room+"|"+s.sessionId+"|"+s.episode+"|"+s.coachAnchor+"|"+s.advancedAirway;
+  if(!s.advancedAirway){
+    // Schedule only the 30 compression beats, aligned to the shared coach clock.
+    // Never play compression clicks during the two mask breaths.
+    const wall=Date.now();
+    const anchor=s.coachAnchor??s.episodeStartAt??wall;
+    const base=Math.max(0,Math.floor((wall-anchor)/MASK_CYCLE_MS));
+    for(let round=base;round<=base+1;round++){
+      for(let beat=0;beat<30;beat++){
+        const target=anchor+round*MASK_CYCLE_MS+beat*COMPRESSION_BEAT_MS;
+        const delay=target-wall;
+        if(delay>=-30 && delay<=360){
+          const key=id+"|"+round+"|"+beat;
+          if(lastCoachBeatKey!==key){
+            playMetronomeBeat(audioContext.currentTime+Math.max(.005,delay/1000));
+            lastCoachBeatKey=key;
+          }
+        }
+      }
+    }
+    return;
+  }
   if(currentMetronomeEpisode!==id){
     currentMetronomeEpisode=id;nextMetronomeBeat=null;
   }
@@ -394,8 +432,8 @@ function checkAlarms(s,clock) {
     if (audioReady && tvMode && nearAlarmKey!==key) {
       nearAlarmKey=key;
       announcements.push(SHOCKABLE_RHYTHMS.has(s.rhythm)?
-        "อีกสิบวินาที ครบรอบซีพีอาร์สองนาที เตรียมเครื่องช็อกและชาร์จตามโปรโตคอลระหว่างกดหน้าอก ตรวจจังหวะอีกครั้งก่อนช็อก":
-        "อีกสิบวินาที ครบรอบซีพีอาร์สองนาที");
+        "อีกสิบวินาที เตรียมชาร์จเครื่องช็อก":
+        "อีกสิบวินาที ตรวจริทึม");
     }
   }
   if (ongoing && cycleIndex>=1 && audioReady && tvMode) {
@@ -403,27 +441,25 @@ function checkAlarms(s,clock) {
     if (cycleEndKey!==key) {
       cycleEndKey=key;
       // Skip stale boundary announcements if the TV was suspended and resumed.
-      if (cycle%TWO_MIN<3000)announcements.push("ครบสองนาที ตรวจจังหวะตามขั้นตอน");
+      if (cycle%TWO_MIN<3000)announcements.push("ตรวจริทึม");
     }
   }
-  const shockable=SHOCKABLE_RHYTHMS.has(s.rhythm);
-  const epiTarget=shockable?FIVE_MIN:FOUR_MIN;
-  const doseTimingActive=connected && ["running","paused"].includes(s.phase) && s.epiAnchor!==null;
-  const due=doseTimingActive && clock.epiMs>=epiTarget;
-  const epiCard=document.getElementById("epiStat");
-  epiCard.classList.toggle("due",!!due);
-  const epiKey=room+"|"+s.sessionId+"|"+s.epiAnchor+"|"+epiTarget;
-  if(shockable && doseTimingActive &&
-      clock.epiMs>=epiTarget-EPI_PREWARN_MS && clock.epiMs<epiTarget &&
+  const doseTimingActive=connected && ["running","paused"].includes(s.phase) && s.lastEpiAt!==null;
+  const epiKey=room+"|"+s.sessionId+"|"+s.lastEpiAt;
+  if(doseTimingActive && clock.epiMs>=FOUR_MIN && clock.epiMs<FIVE_MIN-EPI_PREWARN_MS &&
+      audioReady && epiAlarmKey!==epiKey+"|4"){
+    // One 4-minute cue; a separate key below tracks the 5-minute boundary.
+    epiAlarmKey=epiKey+"|4";
+    announcements.push("อิพิเนฟริน ครบสี่นาที");
+  }
+  if(doseTimingActive && clock.epiMs>=FIVE_MIN-EPI_PREWARN_MS && clock.epiMs<FIVE_MIN &&
       audioReady && epiPreAlertKey!==epiKey){
     epiPreAlertKey=epiKey;
-    announcements.push("อีกสิบวินาทีจะครบห้านาทีหลังอิพิเนฟรินครั้งล่าสุด โปรดทบทวนเวลาการให้ยาตามโปรโตคอล");
+    announcements.push("อิพิเนฟริน อีกยี่สิบวินาที");
   }
-  if(due && audioReady && epiAlarmKey!==epiKey){
-    epiAlarmKey=epiKey;
-    announcements.push(shockable?
-      "ครบห้านาทีหลังอิพิเนฟริน โปรดทบทวนการให้ยาซ้ำตามโปรโตคอล":
-      "ครบสี่นาทีหลังอิพิเนฟริน โปรดทบทวนการให้ยาซ้ำตามโปรโตคอล");
+  if(doseTimingActive && clock.epiMs>=FIVE_MIN && audioReady && epiAlarmKey!==epiKey+"|5"){
+    epiAlarmKey=epiKey+"|5";
+    announcements.push("อิพิเนฟริน ครบห้านาที");
   }
   // At 04:00, CPR and epinephrine alerts occur together: speak both, not
   // two interrupted speech utterances.
@@ -485,23 +521,38 @@ function renderInterruption(s,clock){
   overlay.classList.toggle("active",over);
   if(over&&audioReady&&interruptionAlarmKey!==s.pauseId){
     interruptionAlarmKey=s.pauseId;
-    soundNotice("หยุดกดหน้าอกเกินสิบวินาที ให้กลับมากดหน้าอกต่อทันที",true);
+    soundNotice("ซีพีอาร์ ต่อ",true);
   }
   document.getElementById("ccfSummary").hidden=!(s.phase==="rosc"&&clock.ccf!==null);
 }
 function renderVentilation(s,clock) {
-  const show=s.advancedAirway && ["running","paused"].includes(s.phase);
-  const tv=document.getElementById("ventilator");
-  const mobile=document.getElementById("controllerVent");
+  const show=["running","paused"].includes(s.phase);
+  const tv=document.getElementById("ventilator"),mobile=document.getElementById("controllerVent");
   tv.hidden=mobile.hidden=!show;
   if(!show)return;
-  const remaining=Math.max(1,Math.ceil((6000-clock.ventMs%6000)/1000));
-  const squeeze=s.phase==="running" && remaining===1;
-  document.querySelectorAll('[data-bind="ventTime"]').forEach(el=>{el.textContent=String(remaining);});
-  tv.classList.toggle("squeeze",squeeze);
-  mobile.classList.toggle("squeeze",squeeze);
-  document.getElementById("ventLabel").textContent=squeeze?"SQUEEZE BAG • 1 SECOND":s.phase==="paused"?"CPR PAUSED":"NEXT BREATH IN";
-  document.getElementById("controllerVentLabel").textContent=squeeze?"🟢 SQUEEZE BAG":"NEXT BREATH";
+  const paused=s.phase==="paused";
+  document.getElementById("ventMode").textContent=s.advancedAirway?"ET-TUBE":"30:2";
+  document.getElementById("bagIcon").hidden=!s.advancedAirway;
+  document.getElementById("maskIcon").hidden=s.advancedAirway;
+  let number,label,mobileLabel,squeeze=false;
+  if(s.advancedAirway){
+    number=Math.max(1,Math.ceil((6000-clock.ventMs%6000)/1000));
+    squeeze=!paused && number===1;
+    label=squeeze?"SQUEEZE BAG • 1 SECOND":"NEXT BREATH IN";
+    mobileLabel=squeeze?"SQUEEZE BAG":"NEXT BREATH";
+  }else{
+    const coach=maskCoach(s,paused?s.pausedAt:Date.now());
+    number=coach.breath?coach.breath+"/2":coach.count+"/30";
+    squeeze=!paused&&coach.squeeze;
+    label=coach.breath?(coach.squeeze?"MASK • BREATH "+coach.breath+" / 2":"RELEASE MASK BAG"):"COMPRESSIONS • 30:2";
+    mobileLabel=coach.breath?(coach.squeeze?"BREATH "+coach.breath+"/2":"RELEASE"):"COMPRESSIONS";
+  }
+  if(paused){label=mobileLabel="CPR PAUSED";}
+  document.querySelectorAll('[data-bind="ventTime"]').forEach(el=>{el.textContent=String(number);});
+  tv.classList.toggle("squeeze",squeeze);mobile.classList.toggle("squeeze",squeeze);
+  tv.classList.toggle("mask-coach",!s.advancedAirway);
+  document.getElementById("ventLabel").textContent=label;
+  document.getElementById("controllerVentLabel").textContent=mobileLabel;
 }
 function renderAirwayAndRhythm(s) {
   const active=["running","paused"].includes(s.phase);
@@ -531,8 +582,7 @@ function render() {
     epiTime:s.epiAnchor===null?"00:00":timeText(clock.epiMs),
     epiReminder:s.epiAnchor===null?"รอเริ่ม CPR":
       s.phase==="rosc"?"ROSC • ไม่แจ้งเตือนยา":
-      clock.epiMs>=(SHOCKABLE_RHYTHMS.has(s.rhythm)?FIVE_MIN:FOUR_MIN)?
-        "ครบเป้าหมาย — ตรวจสอบ Protocol":"นับต่อเนื่องจาก Epinephrine ครั้งล่าสุด",
+      s.lastEpiAt===null?"รอบันทึกยาครั้งแรก":clock.epiMs>=280000?"EPINEPHRINE DUE SOON / DUE":clock.epiMs>=240000?"4 MIN • READY":"SINCE LAST DOSE",
     shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm==="VT"?"pVT":s.rhythm,etco2:s.etco2===null?"—":s.etco2,
     episode:s.episode,ccf:clock.ccf===null?"—":clock.ccf.toFixed(1)+"%",
     pauseTotal:timeText(clock.pauseMs),room
@@ -543,7 +593,7 @@ function render() {
     });
   }
   document.getElementById("epiReminderTitle").textContent=
-    "EPINEPHRINE TIMER • "+(SHOCKABLE_RHYTHMS.has(s.rhythm)?"5":"4")+" MIN";
+    "EPINEPHRINE TIMER";
   document.getElementById("amio300Badge").classList.toggle("administered",s.amioDoses.includes(300));
   document.getElementById("amio150Badge").classList.toggle("administered",s.amioDoses.includes(150));
   document.getElementById("roscChecklist").hidden=s.phase!=="rosc";
@@ -619,6 +669,7 @@ function render() {
   const resume=s.phase==="paused";
   pauseResume.dataset.action=resume?"resume":"pause";
   pauseResume.textContent=resume?"▶ RESUME CPR":"Ⅱ PAUSE CPR";
+  pauseResume.classList.toggle("resume-flash",resume);
   pauseResume.disabled=!connected ||
     !["running","paused"].includes(s.phase) ||
     actionCooldownRemaining(s,resume?"resume":"pause",Date.now())>0 ||
@@ -631,8 +682,14 @@ function render() {
   const epiLockMs=actionCooldownRemaining(s,"epi",Date.now());
   const epiLocked=epiLockMs>0;
   epiButton.disabled=!connected || !arrestActive || epiLocked || pendingActions.has("epi");
-  epiButton.classList.toggle("epi-highlight",cue.epiReady && !epiLocked);
-  epiButton.classList.toggle("epi-muted",!cue.epiReady || epiLocked);
+  const epiState=epiColor(s,clock);
+  epiButton.classList.toggle("epi-highlight",epiState==="green" && !epiLocked);
+  epiButton.classList.toggle("epi-muted",epiState==="neutral" || epiLocked);
+  epiButton.classList.toggle("epi-urgent",epiState==="red" && !epiLocked);
+  document.getElementById("epiStat").classList.toggle("due",epiState==="red");
+  document.getElementById("epiStat").classList.toggle("epi-green",epiState==="green");
+  document.getElementById("epiCountHalf").classList.toggle("epi-urgent",epiState==="red");
+  document.getElementById("epiCountHalf").classList.toggle("epi-green",epiState==="green");
   epiButton.classList.toggle("epi-locked",epiLocked);
   const epiHint=document.getElementById("epiLockHint");
   if(epiLocked){
