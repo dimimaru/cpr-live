@@ -41,6 +41,9 @@ const SHOCKABLE_RHYTHMS = new Set(["VF","VT"]);
 const ADJUNCT_NAMES={nahco3:"7.5% NaHCO₃",calcium:"10% Calcium",glucose:"50% Glucose",lidocaine:"Lidocaine"};
 function actionGroup(type,value){ return type==="adjunct"?"adjunct:"+value:type; }
 function actionCooldownRemaining(s,type,now,value){
+  // START is gated by standby/ROSC phase, so a rapid re-arrest cannot be
+  // blocked by the five-second duplicate tap guard from the previous episode.
+  if(type==="start")return 0;
   if(type==="shock")return s.lastShockAt===null?0:Math.max(0,s.lastShockAt+SHOCK_COOLDOWN_MS-now);
   if(type==="epi")return s.lastEpiAt===null?0:Math.max(0,s.lastEpiAt+EPI_COOLDOWN_MS-now);
   const last=s.lastActionAt[actionGroup(type,value)];
