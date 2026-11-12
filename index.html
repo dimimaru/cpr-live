@@ -19,13 +19,17 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.3</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.4</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
         <span id="connectionStatus" class="connection off">● DISCONNECTED</span>
       </div>
     </header>
+    <div class="remote-top-tools" aria-label="Remote controls">
+      <button id="toggleMetronome" class="small-control metronome-button active" data-action="metro" aria-pressed="true">🎵 105 BPM ON</button>
+      <button id="resetBtn" class="small-control danger-control" data-action="reset">↺ RESET</button>
+    </div>
 
     <div id="setupNotice" class="notice" hidden>
       <strong>ยังไม่ได้เชื่อม Supabase</strong>
@@ -43,13 +47,6 @@
         <strong>RHYTHM CHECK IN <span id="alarmSeconds">10</span> s</strong>
       </div>
     </div>
-    <div class="roombar">
-      <label for="roomInput">ROOM</label>
-      <input id="roomInput" maxlength="40" autocomplete="off" spellcheck="false" aria-label="Room code">
-      <button id="joinRoomBtn" class="small-btn">เข้าห้อง</button>
-      <span class="room-readout">Session: <strong id="roomLabel">—</strong></span>
-    </div>
-
     <main>
       <section class="monitor" aria-label="CPR monitor">
         <div class="monitor-top">
@@ -133,7 +130,6 @@
         <div id="onboardingStage" class="remote-onboarding">
           <div id="stageStartScreen" class="remote-onboarding-screen">
             <button id="stageStartBtn" type="button" data-action="start" class="action remote-stage-start-button">▶ START CPR</button>
-            <span class="remote-stage-room">ROOM <strong id="stageRoomLabel">ER-DEMO-01</strong></span>
           </div>
           <div id="stageRhythmScreen" class="remote-onboarding-screen" hidden>
             <div class="remote-stage-heading" id="stageRhythmHeading">SELECT RHYTHM</div>
@@ -144,6 +140,26 @@
               <button type="button" data-action="rhythm" data-value="Asystole" class="action rhythm-button stage-rhythm-button">ASYSTOLE</button>
             </div>
             <span class="remote-stage-clock" id="stageRhythmClock">CPR TIMER IS RUNNING</span>
+            <button type="button" id="stageRoscPromptBtn" class="remote-rhythm-rosc">♥ ROSC</button>
+          </div>
+          <div id="stageRoscReviewScreen" class="remote-onboarding-screen" hidden>
+            <div class="remote-stage-heading">POST-ARREST CHECKLIST</div>
+            <div class="post-rosc-review">
+              <div><strong>01</strong><span>ยืนยันชีพจรและติดตาม ECG / Rhythm</span></div>
+              <div><strong>02</strong><span>12-lead ECG</span></div>
+              <div><strong>03</strong><span>Full V/S — BP, HR, RR, SpO₂, Temp</span></div>
+              <div><strong>04</strong><span>ประเมิน GCS / Neurological status</span></div>
+              <div><strong>05</strong><span>ตรวจ Airway, Oxygenation, Ventilation / EtCO₂</span></div>
+              <div><strong>06</strong><span>ประเมิน Perfusion / Hemodynamics</span></div>
+              <div><strong>07</strong><span>พิจารณา CXR ตามข้อบ่งชี้</span></div>
+            </div>
+            <button id="stageRoscConfirmBtn" type="button" class="action stage-rosc-confirm">
+              ✓ CONFIRM ROSC · END CPR EPISODE
+            </button>
+            <button id="stageRoscBackBtn" type="button" class="stage-rosc-back">กลับไปเลือก Rhythm</button>
+          </div>
+          <div id="stageReArrestScreen" class="remote-onboarding-screen" hidden>
+            <button id="stageReArrestBtn" type="button" data-action="start" class="action remote-stage-start-button">▶ RE-ARREST · START CPR</button>
           </div>
           <div id="stageShockDecisionScreen" class="remote-onboarding-screen" hidden>
             <div class="remote-stage-heading">SHOCKABLE RHYTHM</div>
@@ -184,7 +200,7 @@
             <button id="stageResumeBtn" type="button" data-action="resume" class="action remote-stage-resume-button">▶ RESUME CPR</button>
           </div>
         </div>
-        <div class="section-title"><h2>CPR REMOTE</h2><span>กดจากมือถือ • ส่งผลไปทีวีทันที</span></div>
+        <div class="section-title"><h2>CPR REMOTE</h2></div>
         <div class="quick-status"><strong data-bind="phase">STANDBY</strong><span>CPR <b data-bind="cycle">02:00</b></span><span>ยา <b data-bind="epiTime">00:00</b></span><span>CO₂ <b data-bind="etco2">—</b></span><span>SHOCK <b data-bind="shock">0</b></span><span class="quick-rhythm" data-bind="rhythm">—</span></div>
         <div id="rhythmWarning" class="rhythm-warning" hidden>⚠️ เริ่ม CPR แล้ว — กรุณาบันทึก Rhythm (เวลาเดินต่อได้)</div>
         <div id="peaWidthPicker" class="pea-width-picker" hidden>
@@ -208,7 +224,6 @@
           <p>พิจารณา POCUS หาสาเหตุที่แก้ไขได้ โดยไม่ทำให้การกดหน้าอกหยุดชะงัก</p>
         </div>
         <div class="button-grid remote-main">
-          <button data-action="start" class="action start" id="startButton">▶ START CPR</button>
           <div class="epi-control" id="epiControl" hidden>
             <button data-action="epi" class="action medication epi-muted" id="epiButton">❤️ EPINEPHRINE</button>
             <button data-action="amio" class="action medication amio-muted" id="amioButton" hidden>💉 AMIODARONE 300 mg</button>
@@ -227,8 +242,6 @@
         </div>
         <div class="remote-secondary">
           <button id="pauseResumeBtn" class="small-control" data-action="pause">Ⅱ PAUSE CPR</button>
-          <button id="resetBtn" class="small-control danger-control" data-action="reset">↺ RESET</button>
-          <button id="toggleMetronome" class="small-control metronome-button active" data-action="metro" aria-pressed="true">🎵 105 BPM ON</button>
         </div>
         <div class="adjunct-section">
           <div class="adjunct-heading">ADJUNCT • RECORD ONLY</div>
@@ -266,7 +279,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.3 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.4 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
