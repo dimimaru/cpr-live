@@ -86,6 +86,10 @@ let sequence = 0;
 let switchingRoom = false;
 let pendingShock = false; // Existing SHOCK in-flight guard.
 const pendingActions = new Set(); // Other actions locked before awaiting Supabase.
+let dashboardOpen=false;
+let causeToolsOpen=false;
+let causeTab="pocus";
+let bicarbPickerOpen=false;
 let roscReviewOpen=false; // Local checklist review; ROSC broadcasts only on confirmation.
 
 // Audio is deliberately TV-only. Browsers require a gesture on each TV page
@@ -791,6 +795,94 @@ function roscSelectionAvailable(s){
     (s.rhythm==="—" ||
       (s.phase==="paused" && s.pauseReason==="cycle" && !s.pauseRhythmRecorded));
 }
+function renderCauseTools(s){
+  if(tvMode)return;
+  const active=["running","paused"].includes(s.phase);
+  const nonshock=active && ["PEA","Asystole"].includes(s.rhythm);
+  if(!nonshock){causeToolsOpen=false;causeTab="pocus";}
+  const tool=document.getElementById("nonShockTools");
+  tool.hidden=!nonshock;
+  document.getElementById("causeToolsPanel").hidden=!nonshock||!causeToolsOpen;
+  const toggle=document.getElementById("causeToolsToggle");
+  toggle.disabled=!connected || !nonshock;
+  toggle.setAttribute("aria-expanded",String(nonshock && causeToolsOpen));
+  document.querySelectorAll("[data-cause-tab]").forEach(btn=>{
+    btn.classList.toggle("selected",btn.dataset.causeTab===causeTab);
+  });
+  document.querySelectorAll("[data-cause-pane]").forEach(pane=>{
+    pane.hidden=pane.dataset.causePane!==causeTab;
+  });
+  document.querySelectorAll(".cause-check").forEach(btn=>{
+    btn.classList.toggle("selected",!!s.findings[btn.dataset.value]);
+    btn.disabled=!connected || !nonshock ||
+      (btn.dataset.value.startsWith("pea:")&&s.rhythm!=="PEA") ||
+      actionCooldownRemaining(s,"finding",Date.now(),btn.dataset.value)>0 ||
+      pendingActions.has("finding");
+    btn.setAttribute("aria-pressed",String(!!s.findings[btn.dataset.value]));
+  });
+  document.querySelectorAll(".trauma-procedure-grid button").forEach(btn=>{
+    const done=!!s.procedures[btn.dataset.value];
+    btn.disabled=!connected || !nonshock || done ||
+      pendingActions.has("procedure");
+    btn.classList.toggle("selected",done);
+    btn.textContent=(PROCEDURE_NAMES[btn.dataset.value]||"ICD")+(done?" ✓":"");
+  });
+  const picker=document.getElementById("bicarbDosePicker");
+  picker.hidden=!active||!bicarbPickerOpen;
+  document.getElementById("bicarbToggle").disabled=!connected||!active;
+}
+function renderReportDashboard(s,clock){
+  if(tvMode||s.phase!=="rosc")return;
+  const set=(id,val)=>{document.getElementById(id).textContent=String(val);};
+  set("dashEpisodes",s.episode);
+  set("dashShock",s.shock);
+  set("dashEpi",s.epi);
+  set("dashAmio",s.amioDoses.length);
+  set("dashCcf",clock.ccf===null?"—":clock.ccf.toFixed(1)+"%");
+  set("dashCaseTime",timeText(clock.totalMs));
+  set("dashCprTime",timeText(clock.arrestMs));
+  set("dashPauseTime",timeText(clock.pauseMs));
+  const percent=clock.ccf===null?0:Math.min(100,Math.max(0,clock.ccf));
+  document.getElementById("dashCcfRing").style.background=
+    "conic-gradient(#20ba94 0% "+percent+"%, #cc5369 "+percent+"% 100%)";
+  const count={VF:0,VT:0,PEA:0,Asystole:0};
+  for(const record of s.timeline){
+    if(!record.label.startsWith("RHYTHM: "))continue;
+    const rhythm=record.label.slice(8).trim();
+    if(rhythm==="pVT")count.VT++;
+    else if(Object.prototype.hasOwnProperty.call(count,rhythm))count[rhythm]++;
+  }
+  const max=Math.max(1,...Object.values(count));
+  document.querySelectorAll("[data-dash-bar]").forEach(bar=>{
+    const key=bar.dataset.dashBar;
+    bar.style.width=(100*(count[key]||0)/max)+"%";
+  });
+  document.querySelectorAll("[data-dash-count]").forEach(el=>{
+    el.textContent=count[el.dataset.dashCount]||0;
+  });
+  const records=[];
+  const amps=(s.adjunctCounts.nahco3_1||0)+2*(s.adjunctCounts.nahco3_2||0)+(s.adjunctCounts.nahco3||0);
+  if(amps)records.push(["7.5% NaHCO₃",amps+" amp"]);
+  for(const [key,label]of [["prc","PRC"],["calcium","Calcium"],["glucose","Glucose"],["lidocaine","Lidocaine"]]){
+    if(s.adjunctCounts[key])records.push([label,key==="prc"?s.adjunctCounts[key]+" unit":s.adjunctCounts[key]+" records"]);
+  }
+  const procedures=s.timeline.filter(e=>e.label==="ICD Lt"||e.label==="ICD Rt");
+  if(procedures.length)records.push(["ICD",procedures.map(e=>e.label.replace("ICD ","")).join(", ")]);
+  const pocus=s.timeline.filter(e=>e.label.startsWith("CHECKED: ")||e.label.startsWith("UNCHECKED: "));
+  if(pocus.length)records.push(["POCUS / LAB / TRAUMA",pocus.length+" checklist updates"]);
+  const list=document.getElementById("dashTreatmentSummary");
+  list.replaceChildren();
+  if(!records.length){
+    const empty=document.createElement("span");empty.textContent="No additional records";list.append(empty);
+  }else{
+    for(const [label,value]of records){
+      const entry=document.createElement("div");
+      const name=document.createElement("span");name.textContent=label;
+      const qty=document.createElement("strong");qty.textContent=value;
+      entry.append(name,qty);list.append(entry);
+    }
+  }
+}
 function renderControllerStage(s) {
   if(tvMode)return;
   if(roscReviewOpen && !roscSelectionAvailable(s))roscReviewOpen=false;
@@ -798,7 +890,8 @@ function renderControllerStage(s) {
   const choosing=["running","paused"].includes(s.phase) && s.rhythm==="—";
   const flow=s.shockFlow;
   if(s.phase==="rosc" || s.phase==="standby")roscReviewOpen=false;
-  const stage=s.phase==="rosc"?"reArrest":
+  if(s.phase!=="rosc")dashboardOpen=false;
+  const stage=s.phase==="rosc"?(dashboardOpen?"dashboard":"reArrest"):
     s.phase==="standby"?"start":
     roscReviewOpen?"roscReview":
     flow==="decision"?"decision":
@@ -807,7 +900,7 @@ function renderControllerStage(s) {
     flow==="postShock"?"resume":
     cyclePaused?(s.pauseRhythmRecorded?"resume":"rhythm"):
     choosing?"rhythm":"normal";
-  for(const item of ["start","rhythm","normal","resume","decision","charging","shock","roscReview","reArrest"]){
+  for(const item of ["start","rhythm","normal","resume","decision","charging","shock","roscReview","reArrest","dashboard"]){
     document.body.classList.toggle("remote-stage-"+item,stage===item);
   }
   document.getElementById("onboardingStage").hidden=stage==="normal";
@@ -815,8 +908,14 @@ function renderControllerStage(s) {
     ["stageStartScreen","start"],["stageRhythmScreen","rhythm"],
     ["stageShockDecisionScreen","decision"],["stageChargingScreen","charging"],
     ["stageShockScreen","shock"],["stageResumeScreen","resume"],
-    ["stageRoscReviewScreen","roscReview"],["stageReArrestScreen","reArrest"]
+    ["stageRoscReviewScreen","roscReview"],["stageReArrestScreen","reArrest"],
+    ["stageDashboardScreen","dashboard"]
   ])document.getElementById(screen).hidden=stage!==kind;
+  document.getElementById("stageRoscPdfBtn").disabled=stage!=="reArrest";
+  document.getElementById("stageDashboardBtn").disabled=stage!=="reArrest";
+  document.getElementById("stageDashboardPdfBtn").disabled=stage!=="dashboard";
+  document.getElementById("stageDashboardBackBtn").disabled=stage!=="dashboard";
+  if(stage==="dashboard")renderReportDashboard(s,elapsedFor(s,Date.now()));
   const rhythmRosc=document.getElementById("stageRoscPromptBtn");
   rhythmRosc.disabled=!connected || stage!=="rhythm";
   document.getElementById("stageRoscConfirmBtn").disabled=
@@ -1008,7 +1107,7 @@ function render() {
   amioButton.classList.toggle("amio-muted",!amio.recommended && medication!=="prepare");
   amioButton.disabled=!connected || medication!=="amio" || !arrestActive ||
     actionCooldownRemaining(s,"amio",Date.now())>0 || pendingActions.has("amio");
-  document.querySelectorAll('.adjunct-buttons button').forEach(btn=>{
+  document.querySelectorAll('.adjunct-buttons [data-action="adjunct"]').forEach(btn=>{
     btn.disabled=!connected || !arrestActive ||
       actionCooldownRemaining(s,"adjunct",Date.now(),btn.dataset.value)>0 ||
       pendingActions.has("adjunct");
@@ -1034,6 +1133,7 @@ function render() {
     s.phase==="rosc"?"ONLINE — ROSC • TOTAL CASE TIME STILL RUNNING":
     s.phase==="paused"?"ONLINE — COMPRESSIONS INTERRUPTED • CLOCK CONTINUES":"ONLINE — REALTIME CPR SESSION";
   renderControllerStage(s);
+  renderCauseTools(s);
   renderAirwayAndRhythm(s);
   renderVentilation(s,clock);
   renderECG(s);
@@ -1191,6 +1291,9 @@ async function enterRoom(value) {
   pendingShock=false;
   pendingActions.clear();
   roscReviewOpen=false;
+  dashboardOpen=false;
+  causeToolsOpen=false;
+  bicarbPickerOpen=false;
   messages=new Map();
   nearAlarmKey=cycleEndKey=epiAlarmKey="";
   if ("speechSynthesis" in window)speechSynthesis.cancel();
@@ -1477,10 +1580,41 @@ if(!tvMode){
     if(!roscReviewOpen || !connected || !roscSelectionAvailable(s))return;
     void handleAction("rosc");
   });
+  document.getElementById("stageRoscPdfBtn").addEventListener("click",exportTimelinePDF);
+  document.getElementById("stageDashboardPdfBtn").addEventListener("click",exportTimelinePDF);
+  document.getElementById("stageDashboardBtn").addEventListener("click",()=>{
+    if(computeState().phase!=="rosc")return;
+    dashboardOpen=true;
+    render();
+  });
+  document.getElementById("stageDashboardBackBtn").addEventListener("click",()=>{
+    dashboardOpen=false;
+    render();
+  });
+  document.getElementById("bicarbToggle").addEventListener("click",()=>{
+    const s=computeState();
+    if(!connected||!["running","paused"].includes(s.phase))return;
+    bicarbPickerOpen=!bicarbPickerOpen;
+    render();
+  });
+  document.getElementById("causeToolsToggle").addEventListener("click",()=>{
+    const s=computeState();
+    if(!connected||!["running","paused"].includes(s.phase)||
+      !["PEA","Asystole"].includes(s.rhythm))return;
+    causeToolsOpen=!causeToolsOpen;
+    render();
+  });
+  document.querySelectorAll("[data-cause-tab]").forEach(btn=>btn.addEventListener("click",()=>{
+    if(!causeToolsOpen)return;
+    causeTab=btn.dataset.causeTab;
+    render();
+  }));
 }
 document.querySelectorAll("[data-action]").forEach(btn=>
   btn.addEventListener("click",()=>{
     const action=btn.dataset.action;
+    if(action==="procedure" &&
+      !confirm("ยืนยันว่าได้ทำ "+(PROCEDURE_NAMES[btn.dataset.value]||"ICD")+" แล้ว?"))return;
     if(action==="reset"){
       const state=computeState(),measurement=elapsedFor(state,Date.now());
       const fraction=measurement.ccf===null?"—":measurement.ccf.toFixed(1)+"%";
@@ -1489,6 +1623,7 @@ document.querySelectorAll("[data-action]").forEach(btn=>
         "\nกรุณา Export PDF ก่อนล้างข้อมูลทั้งหมด"))return;
     }
     // PAUSE CPR must be immediate: confirmation would add avoidable hands-off delay.
+    if(action==="adjunct" && btn.dataset.value.startsWith("nahco3_"))bicarbPickerOpen=false;
     handleAction(action,btn.dataset.value);
   })
 );
