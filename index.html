@@ -14,12 +14,12 @@
   <link rel="icon" type="image/svg+xml" href="./assets/cpr-remote.svg">
   <link rel="stylesheet" href="./styles.css">
 </head>
-<body>
+<body class="remote-stage-start">
   <div class="app">
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.0.3</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.1</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -121,6 +121,22 @@
       </section>
 
       <section id="controllerPanel" class="controller" aria-label="CPR remote controller">
+        <div id="onboardingStage" class="remote-onboarding">
+          <div id="stageStartScreen" class="remote-onboarding-screen">
+            <button id="stageStartBtn" type="button" data-action="start" class="action remote-stage-start-button">▶ START CPR</button>
+            <span class="remote-stage-room">ROOM <strong id="stageRoomLabel">ER-DEMO-01</strong></span>
+          </div>
+          <div id="stageRhythmScreen" class="remote-onboarding-screen" hidden>
+            <div class="remote-stage-heading">SELECT RHYTHM</div>
+            <div class="remote-stage-rhythm-grid">
+              <button type="button" data-action="rhythm" data-value="VF" class="action rhythm-button stage-rhythm-button">⚡ VF</button>
+              <button type="button" data-action="rhythm" data-value="VT" class="action rhythm-button stage-rhythm-button">⚡ pVT</button>
+              <button type="button" data-action="rhythm" data-value="PEA" class="action rhythm-button stage-rhythm-button">PEA</button>
+              <button type="button" data-action="rhythm" data-value="Asystole" class="action rhythm-button stage-rhythm-button">ASYSTOLE</button>
+            </div>
+            <span class="remote-stage-clock">CPR TIMER IS RUNNING</span>
+          </div>
+        </div>
         <div class="section-title"><h2>CPR REMOTE</h2><span>กดจากมือถือ • ส่งผลไปทีวีทันที</span></div>
         <div class="quick-status"><strong data-bind="phase">STANDBY</strong><span>CPR <b data-bind="cycle">02:00</b></span><span>ยา <b data-bind="epiTime">00:00</b></span><span>CO₂ <b data-bind="etco2">—</b></span><span>SHOCK <b data-bind="shock">0</b></span><span class="quick-rhythm" data-bind="rhythm">—</span></div>
         <div id="rhythmWarning" class="rhythm-warning" hidden>⚠️ เริ่ม CPR แล้ว — กรุณาบันทึก Rhythm (เวลาเดินต่อได้)</div>
@@ -153,9 +169,8 @@
         <div class="button-grid remote-main">
           <button data-action="start" class="action start" id="startButton">▶ START CPR</button>
           <div class="shock-control"><button id="shockButton" data-action="shock" class="action shock">⚡ SHOCK</button><span id="shockCooldownHint" class="shock-cooldown-hint" hidden></span></div>
-          <div class="epi-control"><button data-action="epi" class="action medication epi-muted" id="epiButton">❤️ EPINEPHRINE</button><span id="epiLockHint" class="drug-lock-hint" hidden>LOCKED</span></div>
+          <div class="epi-control" id="epiControl"><button data-action="epi" class="action medication epi-muted" id="epiButton">❤️ EPINEPHRINE</button><span id="epiLockHint" class="drug-lock-hint" hidden>LOCKED</span></div>
           <button data-action="amio" class="action medication amio-muted" id="amioButton">💉 AMIODARONE 300 mg</button>
-          <button data-action="rosc" class="action rosc">♥ ROSC</button>
           <div id="airwayAction" class="airway-action">
             <button id="etTubeBtn" data-action="etTube" class="action airway">🫁 ET-TUBE</button>
             <form id="etco2Form" class="etco2-form" hidden>
@@ -199,7 +214,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.0.3 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.1 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
