@@ -996,3 +996,111 @@ body:not(.tv-mode) .adjunct-buttons button:disabled{
 @media(prefers-reduced-motion:reduce){
   body:not(.tv-mode) .remote-stage-shock-button.critical{animation:none}
 }
+
+
+/* V1.4 — top utility controls; ROSC checklist review & single Re-arrest button */
+body:not(.tv-mode) .remote-top-tools{
+  display:flex;gap:10px;align-items:center;justify-content:flex-end;
+  margin:8px 0 13px;padding:0;
+}
+body:not(.tv-mode) .remote-top-tools .small-control{
+  flex:0 0 auto;min-height:44px;border-radius:10px;
+  padding:9px 15px;font-size:clamp(11px,2.8vw,14px);font-weight:850;
+}
+body:not(.tv-mode) .remote-top-tools #toggleMetronome{
+  min-width:150px;background:#15533f;border:1px solid #38b98d;
+}
+body:not(.tv-mode) .remote-top-tools #resetBtn{
+  min-width:91px;
+}
+body:not(.tv-mode):is(.remote-stage-roscReview,.remote-stage-reArrest) :is(.roombar,.monitor,.timeline-section,.footer){
+  display:none!important;
+}
+body:not(.tv-mode):is(.remote-stage-roscReview,.remote-stage-reArrest) .controller>:not(#onboardingStage){
+  display:none!important;
+}
+body:not(.tv-mode):is(.remote-stage-roscReview,.remote-stage-reArrest) .controller{
+  display:flex;align-items:center;justify-content:center;
+  min-height:calc(100dvh - 185px);margin-top:8px;
+  border:0;background:transparent;box-shadow:none;
+  padding:clamp(8px,3vw,22px);
+}
+body:not(.tv-mode) .remote-rhythm-rosc{
+  width:100%;max-width:340px;margin-top:3px;
+  border:1px solid #67bda5;background:transparent;color:#c6f5e2;
+  border-radius:13px;min-height:52px;
+  font-size:17px;font-weight:850;
+}
+body:not(.tv-mode) .remote-rhythm-rosc:disabled{
+  opacity:.35;
+}
+body:not(.tv-mode) .post-rosc-review{
+  width:100%;border-radius:17px;background:#10263b;
+  border:1px solid #355973;padding:9px 15px;
+  display:flex;flex-direction:column;gap:0;
+}
+body:not(.tv-mode) .post-rosc-review>div{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 0;border-bottom:1px solid #29465d;
+  color:#e3f2ff;line-height:1.32;font-size:clamp(13px,3.3vw,17px);
+}
+body:not(.tv-mode) .post-rosc-review>div:last-child{border-bottom:0}
+body:not(.tv-mode) .post-rosc-review>div>strong{
+  font-size:12px;flex:0 0 27px;
+  width:27px;height:27px;border-radius:8px;
+  display:grid;place-items:center;background:#18513f;color:#86f3c6;
+}
+body:not(.tv-mode) .stage-rosc-confirm{
+  width:100%;max-width:740px;
+  min-height:clamp(72px,12vh,115px);
+  font-size:clamp(15px,4vw,25px);
+  background:#0f7857;border:2px solid #5de9bc;
+  border-radius:19px;font-weight:900;
+}
+body:not(.tv-mode) .stage-rosc-back{
+  min-height:40px;min-width:160px;
+  padding:8px 18px;border:1px solid #51708e;
+  background:#19354e;border-radius:10px;
+  color:#bed6ec;font-size:13px;font-weight:750;
+}
+body:not(.tv-mode).remote-stage-reArrest .remote-stage-start-button{
+  min-height:clamp(180px,45vh,350px);
+  font-size:clamp(26px,6.9vw,49px);
+  line-height:1.15;
+}
+body:not(.tv-mode) .remote-main{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+body:not(.tv-mode) .remote-main .action{
+  min-height:112px;padding:15px 9px;
+  font-size:clamp(17px,4.1vw,23px);
+  border-radius:15px;line-height:1.2;
+}
+body:not(.tv-mode) .remote-main .epi-control .action{
+  min-height:112px;font-size:clamp(16px,3.8vw,22px);
+}
+body:not(.tv-mode) .remote-main:has(.epi-control[hidden]) #airwayAction{
+  grid-column:1/-1;
+}
+body:not(.tv-mode) #airwayAction .action{
+  width:100%;
+}
+body:not(.tv-mode) .remote-secondary{
+  display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px;
+}
+body:not(.tv-mode) .remote-secondary #pauseResumeBtn{
+  min-height:66px;font-size:clamp(17px,4vw,23px);
+}
+body:not(.tv-mode) .adjunct-buttons button{
+  min-height:52px;font-size:clamp(12px,2.6vw,15px);
+}
+@media(max-width:440px){
+  body:not(.tv-mode) .remote-top-tools{gap:7px}
+  body:not(.tv-mode) .remote-top-tools .small-control{
+    padding:8px 10px;font-size:12px;
+  }
+  body:not(.tv-mode) .remote-main{gap:9px}
+  body:not(.tv-mode) .post-rosc-review{padding:6px 11px}
+  body:not(.tv-mode) .post-rosc-review>div{padding:8px 0}
+}
