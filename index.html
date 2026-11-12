@@ -19,7 +19,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.1</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.2</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -87,11 +87,20 @@
             </div>
             <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
             <div class="stat etco2-stat" id="co2Stat">
-              <span>EtCO₂</span>
-              <div class="co2-value"><strong data-bind="etco2">—</strong><small>mmHg</small></div>
+              <span id="co2Heading">AMBU 30:2</span>
+              <div class="co2-state-message" id="co2StateMessage">30 COMPRESSIONS · 2 BREATHS</div>
+              <div class="co2-value" id="co2Value" hidden><strong data-bind="etco2">—</strong><small>mmHg</small></div>
               <div class="co2-warning" id="co2Warning" hidden>⚠️ CO₂ &lt; 10 — CHECK HIGH-QUALITY CPR</div>
             </div>
           </div>
+        </div>
+        <div id="rhythmPauseBanner" class="rhythm-pause-banner" hidden>
+          <strong id="tvRhythmPauseMessage">PAUSE CPR — IDENTIFY RHYTHM</strong>
+          <span id="tvRhythmPauseElapsed">0.0 s HANDS-OFF</span>
+        </div>
+        <div id="co2AttachOverlay" class="co2-attach-overlay" hidden>
+          <strong>ATTACH CO₂ MONITOR</strong>
+          <span>RECORD INITIAL EtCO₂ TO CLEAR THIS ALERT</span>
         </div>
         <div class="ventilator" id="ventilator" hidden>
           <div class="vent-ratio" id="ventRatio"><span>CPR COACH</span><strong>30 : 2</strong><span>MASK VENTILATION</span></div>
@@ -127,14 +136,23 @@
             <span class="remote-stage-room">ROOM <strong id="stageRoomLabel">ER-DEMO-01</strong></span>
           </div>
           <div id="stageRhythmScreen" class="remote-onboarding-screen" hidden>
-            <div class="remote-stage-heading">SELECT RHYTHM</div>
+            <div class="remote-stage-heading" id="stageRhythmHeading">SELECT RHYTHM</div>
             <div class="remote-stage-rhythm-grid">
               <button type="button" data-action="rhythm" data-value="VF" class="action rhythm-button stage-rhythm-button">⚡ VF</button>
               <button type="button" data-action="rhythm" data-value="VT" class="action rhythm-button stage-rhythm-button">⚡ pVT</button>
               <button type="button" data-action="rhythm" data-value="PEA" class="action rhythm-button stage-rhythm-button">PEA</button>
               <button type="button" data-action="rhythm" data-value="Asystole" class="action rhythm-button stage-rhythm-button">ASYSTOLE</button>
             </div>
-            <span class="remote-stage-clock">CPR TIMER IS RUNNING</span>
+            <span class="remote-stage-clock" id="stageRhythmClock">CPR TIMER IS RUNNING</span>
+          </div>
+          <div id="stageResumeScreen" class="remote-onboarding-screen" hidden>
+            <div class="remote-stage-heading">RHYTHM RECORDED</div>
+            <div class="remote-resume-timer">
+              <span>RHYTHM CHECK · 3-SECOND TARGET</span>
+              <strong id="stageResumeCountdown">3.0 s</strong>
+              <span id="stageResumeElapsed">HANDS-OFF 0.0 s</span>
+            </div>
+            <button id="stageResumeBtn" type="button" data-action="resume" class="action remote-stage-resume-button">▶ RESUME CPR</button>
           </div>
         </div>
         <div class="section-title"><h2>CPR REMOTE</h2><span>กดจากมือถือ • ส่งผลไปทีวีทันที</span></div>
@@ -214,7 +232,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.1 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.2 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
