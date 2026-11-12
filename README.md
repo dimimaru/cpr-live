@@ -243,3 +243,17 @@ identifier, iOS apple-touch-icon and PNG icons (180, 192, 512 px).
 
 Still simulation only; browser audio and real-time synchronization are not
 guaranteed and no patient information should be stored.
+
+
+## V1.1 — Staged mobile Remote and conditional medication controls
+
+- On first opening of a standby room, the Controller shows exactly one large **START CPR** button (the TV remains the full monitor). The configured room is shown as non-interactive text.
+- START CPR **starts the case and CPR clock immediately**, then opens four large initial Rhythm buttons: VF, pVT, PEA, Asystole. The ordinary controller (timeline, controls, PEA narrow/wide selector) appears after choosing a Rhythm.
+- Once a Rhythm is recorded, the old START position becomes **ROSC**. The separate ROSC button has been removed. After ROSC this same button reads **Re-CPR**; tapping starts a new arrest episode and displays the four large Rhythm choices again.
+- Epinephrine control remains hidden until **Shock #2** in the shockable pathway, or immediately after the first PEA/Asystole Rhythm in a nonshockable pathway. If the episode previously passed through PEA/Asystole and later changes to VF/pVT, the Epinephrine control remains visible.
+- For an episode that starts VF/pVT: **Shock #2** reveals an informational, disabled **'Prepare Amiodarone 300 mg'** button; after Shock #3 it can document 300 mg.
+- For an episode that passed through PEA/Asystole before VF/pVT: **Shock #2** enables recording **Amiodarone 300 mg** by explicit project choice B. This same threshold is enforced in the event reducer; the button cannot just be bypassed by an incoming event. No amiodarone control appears while currently PEA/Asystole.
+- Previously supported 150 mg administration/preparation logic, shock cooldown, medication lockout, TV monitor, broadcast sync, ventilation coach and timeline report are otherwise retained.
+- `fromNonShockable` tracks rhythms only within the *current* arrest episode and resets on Re-CPR, whereas overall event timeline and dose/shock totals persist for the session.
+
+**Clinical caveat:** The branch-specific Amiodarone 300 mg after the second shock is an explicitly requested custom simulation rule, not a blanket ACLS recommendation. Do not use this prototype to determine a patient's medication timing, and do not enter identifiable patient data. Event delivery and countdowns cannot be guaranteed on the public realtime channel.
