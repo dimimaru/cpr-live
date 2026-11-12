@@ -1,0 +1,26 @@
+{
+  "name": "CPR Live Remote",
+  "short_name": "CPR Remote",
+  "id": "./app/remote",
+  "start_url": "./?room=ER-DEMO-01",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#031634",
+  "theme_color": "#031634",
+  "orientation": "portrait",
+  "description": "CPR event remote, timeline, report, and ACLS guidance — simulation only",
+  "icons": [
+    {
+      "src": "./assets/cpr-remote-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/cpr-remote-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
