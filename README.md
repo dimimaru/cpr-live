@@ -270,3 +270,19 @@ guaranteed and no patient information should be stored.
 - The pre-intubation 30:2 mask coaching and post-intubation 6-second ventilation coaching remain visible separately.
 
 **Simulation limitations:** This automatically logs a pause in the app, but cannot detect or control real chest compressions. The automation requires an active, connected Controller in the foreground; suspended browsers, disconnected devices, clock drift or failed broadcasts may delay/miss events. A high-priority clinical timer must never rely on this public demo.
+
+
+## V1.3 — Shockable charging/clear flow, one medication slot, adjunct logs
+
+- **ROSC** is a small button on the normal Remote and now asks for confirmation before recording.
+- The normal Remote no longer shows the four Rhythm selection buttons or the ventilation strip. Rhythm choices appear in the large START/re-arrest or two-minute rhythm-check stage only; the TV ventilation coaching is unchanged.
+- Selecting **VF/pVT** opens two alternatives:
+  - **RESUME CPR (CHARGING)**: continue/resume compressions while the defibrillator is charging. If a cycle rhythm check had already paused compressions, that pause is closed and included in the manual CCF. Then **CLEAR (CHARGE READY)** starts a new peri-shock hands-off interval.
+  - **CLEAR (CHARGE READY)** directly: enters peri-shock pause and proceeds to **SHOCK → RESUME CPR** without the charging stage. If a rhythm check had already paused compressions, that *existing* pause continues to count towards CCF.
+- The large SHOCK button only becomes available *after* CLEAR, with the existing fresh VF/pVT rhythm requirement and 100-second duplicate-log cooldown. RESUME remains a separate, explicit tap after a recorded Shock, and starts the next two-minute CPR cycle.
+- The big shock-stage countdown begins at the **CLEAR** event and turns red after 3 seconds. The manual CCF uses **all actual logged compression pauses**, including any pause before CLEAR. This prevents under-counting earlier rhythm-analysis interruptions. These are user-button timestamps, not real compression sensor measurements.
+- **Epinephrine and Amiodarone share ONE medication slot**. Epi appears when the first nonshockable rhythm is recorded or after Shock #2 and is available once its three-minute lock permits. Amiodarone is shown for preparation or documentation when the shock count and previously selected nonshockable pathway require it. When both are eligible, the UI prioritizes the active cycle's step, favouring overdue Epi at 5 minutes. No simultaneous Epi and Amiodarone buttons are shown.
+- A small **ADJUNCT • RECORD ONLY** row lets users log 7.5% NaHCO3, 10% Calcium, 50% Glucose, and Lidocaine. These are optional time-stamped entries in the Timeline and PDF; a five-second per-adjunct duplicate guard is applied. The app does **not** automatically recommend an adjunct or infer dose/indication.
+- Controller/TV event reduction recognizes the new `charge`, `clear`, and `adjunct` actions, preserving event timestamps in the shared session.
+
+**Clinical caveat:** Continue compressions during charging where appropriate and minimize both pre- and post-shock interruptions. The app uses an expressly user-configured demonstration sequence; it is not validated for clinical decision support and must never delay treatment, enforce medication timing, or store identifiable patient information.
