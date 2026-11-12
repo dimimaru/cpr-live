@@ -743,3 +743,11 @@ body.tv-mode .stat.timer-stat.due strong,body.tv-mode .stat.timer-stat.due small
 body.tv-mode .ventilator.mask-coach .vent-time strong{font-size:clamp(24px,3.2vw,48px);white-space:nowrap}
 body.tv-mode .ventilator.mask-coach .vent-visual{gap:12px}
 @media(prefers-reduced-motion:reduce){.small-control.resume-flash{animation:none}}
+
+/* v1.0.3 — TV clearly identifies 30:2 before an advanced airway. */
+body.tv-mode .ventilator.mask-coach{display:flex;flex-direction:column;gap:4px}
+body.tv-mode .vent-ratio{display:flex;align-items:center;justify-content:center;gap:14px;color:#c9ecff;font-size:clamp(9px,.75vw,12px);font-weight:800;letter-spacing:.05em}
+body.tv-mode .vent-ratio strong{font-size:clamp(17px,1.7vw,25px);color:#fff;white-space:nowrap}
+body.tv-mode .ventilator.mask-coach.squeeze{background:#065e43}
+body.tv-mode .ventilator.mask-coach .vent-time span{font-size:clamp(11px,1.1vw,16px)}
+@media(max-height:680px) and (min-aspect-ratio:1/1){body.tv-mode .vent-ratio{gap:8px;font-size:8px}body.tv-mode .vent-ratio strong{font-size:15px}}
