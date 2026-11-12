@@ -800,3 +800,107 @@ body:not(.tv-mode) .remote-main #startButton{font-size:clamp(17px,3.8vw,24px)}
   .remote-stage-rhythm-grid{gap:10px}
   .remote-stage-rhythm-grid>.stage-rhythm-button{min-height:clamp(130px,23vh,210px)}
 }
+
+
+/* V1.2 — timed rhythm check, three-second hands-off reminder, CO2 workflow. */
+body:not(.tv-mode).remote-stage-resume .roombar,
+body:not(.tv-mode).remote-stage-resume .monitor,
+body:not(.tv-mode).remote-stage-resume .timeline-section,
+body:not(.tv-mode).remote-stage-resume .footer,
+body:not(.tv-mode).remote-stage-resume .controller>:not(#onboardingStage){
+  display:none!important;
+}
+body:not(.tv-mode).remote-stage-resume .controller{
+  display:flex;align-items:center;justify-content:center;
+  min-height:calc(100dvh - 130px);margin-top:8px;
+  border:0;background:transparent;box-shadow:none;
+  padding:clamp(12px,5vw,30px);
+}
+.remote-resume-timer{
+  width:100%;border:1px solid #365d73;
+  background:#142d42;border-radius:17px;
+  display:flex;flex-direction:column;align-items:center;
+  gap:6px;padding:12px 10px;
+  font-variant-numeric:tabular-nums;
+}
+.remote-resume-timer span{font-size:clamp(12px,2.8vw,16px);font-weight:800;color:#b6d0e3}
+.remote-resume-timer strong{font-size:clamp(46px,12vw,82px);line-height:1.1;color:#fff}
+.remote-stage-resume-button{
+  width:100%;max-width:660px;min-height:clamp(160px,36vh,300px);
+  font-size:clamp(29px,7vw,52px);font-weight:900;
+  background:#137e5a!important;border:3px solid #50e5af!important;
+  border-radius:26px!important;
+  box-shadow:0 10px 40px rgba(16,173,110,.17);
+  animation:resume-pulse 850ms ease-in-out infinite;
+}
+.remote-stage-resume-button.critical{
+  background:#bd1b3d!important;
+  border-color:#ff6580!important;
+  animation:critical-resume-pulse 700ms ease-in-out infinite;
+  box-shadow:0 12px 35px rgba(213,21,52,.25);
+}
+@keyframes critical-resume-pulse{
+  50%{background:#75152c!important;box-shadow:0 0 0 7px #ef376147}
+}
+body.tv-mode .rhythm-pause-banner:not([hidden]){
+  position:fixed;z-index:95;left:50%;top:30%;transform:translateX(-50%);
+  width:min(94vw,920px);
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  border-radius:20px;padding:18px 22px;text-align:center;
+  background:rgba(91,54,7,.97);border:5px solid #ffc65c;
+  box-shadow:0 8px 45px #000c;
+}
+body.tv-mode .rhythm-pause-banner strong{
+  font-size:clamp(23px,4.3vw,54px);line-height:1.13;color:#fff;
+}
+body.tv-mode .rhythm-pause-banner span{
+  color:#ffedc3;font-size:clamp(17px,2.9vw,34px);
+  font-weight:900;font-variant-numeric:tabular-nums;
+}
+body.tv-mode .rhythm-pause-banner.critical{
+  background:rgba(139,14,37,.98);border-color:#ff5070;
+  animation:critical-resume-pulse 700ms ease-in-out infinite;
+}
+body.tv-mode .stat.timer-stat [data-bind="epiTime"]{
+  overflow-wrap:anywhere;white-space:normal;text-align:center;
+  font-size:clamp(21px,3.6vw,61px);
+}
+body.tv-mode .stat.etco2-stat.ambu-coach{
+  background:#113f48;border-color:#39acb5;
+}
+body.tv-mode .stat.etco2-stat.co2-awaiting{
+  background:#6e1c2b!important;border:2px solid #ff758b;
+  animation:critical-resume-pulse 850ms ease-in-out infinite;
+}
+body.tv-mode .co2-state-message{
+  width:100%;font-size:clamp(15px,1.65vw,28px);
+  line-height:1.2;font-weight:900;color:#fff;text-align:center;
+  overflow-wrap:anywhere;
+}
+body.tv-mode .co2-attach-overlay:not([hidden]){
+  position:fixed;top:8%;left:50%;transform:translateX(-50%);
+  z-index:85;width:min(93vw,900px);
+  padding:15px 20px;border-radius:18px;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  border:4px solid #ff6d7c;background:rgba(118,19,40,.96);
+  box-shadow:0 8px 45px #000b;
+  color:#fff;text-align:center;
+}
+body.tv-mode .co2-attach-overlay strong{
+  font-size:clamp(24px,4vw,49px);line-height:1.1;
+}
+body.tv-mode .co2-attach-overlay span{
+  font-size:clamp(11px,1.4vw,18px);font-weight:800;color:#ffd5dd;
+}
+body:not(.tv-mode) .rhythm-pause-banner,
+body:not(.tv-mode) .co2-attach-overlay{display:none!important}
+@media(max-height:650px) and (min-aspect-ratio:1/1){
+ body.tv-mode .rhythm-pause-banner:not([hidden]){top:26%;padding:8px 12px}
+ body.tv-mode .co2-attach-overlay:not([hidden]){top:5%;padding:8px 12px}
+}
+@media(prefers-reduced-motion:reduce){
+ .remote-stage-resume-button,
+ .remote-stage-resume-button.critical,
+ body.tv-mode .rhythm-pause-banner.critical,
+ body.tv-mode .stat.etco2-stat.co2-awaiting{animation:none}
+}
