@@ -5,7 +5,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle
 
 const cfg = window.CPR_CONFIG || {};
 const params = new URLSearchParams(location.search);
-const tvMode = params.get("view") === "tv";
+const tvMode = params.get("view") === "tv" || window.CPR_FORCE_TV_MODE === true;
+// Legacy ?view=tv still displays the monitor; dedicated tv.html has a stable
+// manifest, app ID and Apple touch icon for Home Screen installation.
+if(tvMode){
+  const manifest=document.querySelector('link[rel="manifest"]');
+  const appleIcon=document.querySelector('link[rel="apple-touch-icon"]');
+  if(manifest)manifest.setAttribute("href","./manifest-monitor.webmanifest");
+  if(appleIcon)appleIcon.setAttribute("href","./assets/cpr-monitor-180.png");
+  document.title="CPR Live Monitor";
+}
 const DEVICE_ID = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + "-" + Math.random();
 const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2"]);
 const TWO_MIN = 120000;
@@ -883,10 +892,9 @@ async function enterRoom(value) {
   switchingRoom=false;
 }
 function makeLink(view) {
-  const url=new URL(location.href);
+  const base=new URL("./",location.href);
+  const url=new URL(view==="tv"?"tv.html":"",base);
   url.searchParams.set("room",room);
-  if (view==="tv")url.searchParams.set("view","tv");
-  else url.searchParams.delete("view");
   return url.toString();
 }
 async function copyLink(view) {
