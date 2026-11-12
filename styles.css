@@ -1292,3 +1292,6 @@ body:not(.tv-mode) #stageDashboardBackBtn{width:100%;min-height:54px}
 @media(prefers-reduced-motion:reduce){
   body:not(.tv-mode) .dashboard-bar{transition:none}
 }
+
+/* Ensure native [hidden] wins over authored flex/grid display across all stages. */
+[hidden]{display:none!important}
