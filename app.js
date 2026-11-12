@@ -639,6 +639,8 @@ function renderInterruption(s,clock){
   if(tvMode&&paused){
     const cyclePause=s.pauseReason==="cycle";
     document.getElementById("tvRhythmPauseMessage").textContent=
+      s.shockFlow==="readyShock"?"CLEAR — SHOCK":
+      s.shockFlow==="postShock"?"SHOCK RECORDED — RESUME CPR":
       cyclePause && s.pauseRhythmRecorded?"RHYTHM IDENTIFIED — RESUME CPR":
       "PAUSE CPR — IDENTIFY RHYTHM";
     document.getElementById("tvRhythmPauseElapsed").textContent=
