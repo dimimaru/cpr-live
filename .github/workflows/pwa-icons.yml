@@ -1,0 +1,38 @@
+name: Prepare CPR PWA icons
+on:
+  push:
+    paths:
+      - 'assets/cpr-remote.svg'
+      - 'assets/cpr-monitor.svg'
+      - '.github/workflows/pwa-icons.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  generate-icons:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Render SVG artworks into Apple and PWA icons
+        run: |
+          python -m pip install --quiet cairosvg
+          python - <<'PY'
+          from pathlib import Path
+          import cairosvg
+          for name in ('remote', 'monitor'):
+              source = Path('assets') / f'cpr-{name}.svg'
+              for size in (180, 192, 512):
+                  output = Path('assets') / f'cpr-{name}-{size}.png'
+                  cairosvg.svg2png(url=str(source),write_to=str(output),
+                                   output_width=size,output_height=size)
+          PY
+      - name: Commit PNG icons
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/cpr-remote-{180,192,512}.png assets/cpr-monitor-{180,192,512}.png
+          if ! git diff --cached --quiet; then
+            git commit -m "Render CPR Remote and Monitor PWA PNG icons"
+            git push
+          fi
