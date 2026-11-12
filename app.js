@@ -799,6 +799,7 @@ function renderCauseTools(s){
   if(tvMode)return;
   const active=["running","paused"].includes(s.phase);
   const nonshock=active && ["PEA","Asystole"].includes(s.rhythm);
+  if(!active)bicarbPickerOpen=false;
   if(!nonshock){causeToolsOpen=false;causeTab="pocus";}
   const tool=document.getElementById("nonShockTools");
   tool.hidden=!nonshock;
