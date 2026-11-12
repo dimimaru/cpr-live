@@ -1,4 +1,4 @@
-// CPR Live v1.3 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.4 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -57,6 +57,7 @@ let sequence = 0;
 let switchingRoom = false;
 let pendingShock = false; // Existing SHOCK in-flight guard.
 const pendingActions = new Set(); // Other actions locked before awaiting Supabase.
+let roscReviewOpen=false; // Local checklist review; ROSC broadcasts only on confirmation.
 
 // Audio is deliberately TV-only. Browsers require a gesture on each TV page
 // before sound and Web Speech are reliably permitted.
@@ -83,8 +84,10 @@ const MASK_CYCLE_MS=THIRTY_BEATS_MS+TWO_BREATHS_MS;
 document.body.classList.toggle("tv-mode",tvMode);
 document.getElementById("timelineSection").hidden=tvMode;
 document.getElementById("modeBadge").textContent = tvMode ? "TV DISPLAY" : "CONTROLLER";
-document.getElementById("roomInput").value = room;
-document.getElementById("roomLabel").textContent = room;
+const initialRoomInput=document.getElementById("roomInput");
+if(initialRoomInput)initialRoomInput.value=room;
+const initialRoomLabel=document.getElementById("roomLabel");
+if(initialRoomLabel)initialRoomLabel.textContent=room;
 
 function blankState() {
   return {
@@ -743,23 +746,34 @@ function renderControllerStage(s) {
   const cyclePaused=s.phase==="paused" && s.pauseReason==="cycle";
   const choosing=["running","paused"].includes(s.phase) && s.rhythm==="—";
   const flow=s.shockFlow;
-  const stage=s.phase==="standby"?"start":
+  if(s.phase==="rosc" || s.phase==="standby")roscReviewOpen=false;
+  const stage=s.phase==="rosc"?"reArrest":
+    s.phase==="standby"?"start":
+    roscReviewOpen?"roscReview":
     flow==="decision"?"decision":
     flow==="charging"?"charging":
     flow==="readyShock"?"shock":
     flow==="postShock"?"resume":
     cyclePaused?(s.pauseRhythmRecorded?"resume":"rhythm"):
     choosing?"rhythm":"normal";
-  for(const item of ["start","rhythm","normal","resume","decision","charging","shock"]){
+  for(const item of ["start","rhythm","normal","resume","decision","charging","shock","roscReview","reArrest"]){
     document.body.classList.toggle("remote-stage-"+item,stage===item);
   }
   document.getElementById("onboardingStage").hidden=stage==="normal";
   for(const [screen,kind] of [
     ["stageStartScreen","start"],["stageRhythmScreen","rhythm"],
     ["stageShockDecisionScreen","decision"],["stageChargingScreen","charging"],
-    ["stageShockScreen","shock"],["stageResumeScreen","resume"]
+    ["stageShockScreen","shock"],["stageResumeScreen","resume"],
+    ["stageRoscReviewScreen","roscReview"],["stageReArrestScreen","reArrest"]
   ])document.getElementById(screen).hidden=stage!==kind;
-  document.getElementById("stageRoomLabel").textContent=room;
+  const rhythmRosc=document.getElementById("stageRoscPromptBtn");
+  rhythmRosc.disabled=!connected || stage!=="rhythm";
+  document.getElementById("stageRoscConfirmBtn").disabled=
+    !connected || stage!=="roscReview" || pendingActions.has("rosc") ||
+    actionCooldownRemaining(s,"rosc",Date.now())>0;
+  document.getElementById("stageReArrestBtn").disabled=
+    !connected || stage!=="reArrest" || pendingActions.has("start") ||
+    actionCooldownRemaining(s,"start",Date.now())>0;
   document.getElementById("stageRhythmHeading").textContent=cyclePaused?
     "IDENTIFY RHYTHM":"SELECT RHYTHM";
   document.getElementById("stageRhythmClock").textContent=cyclePaused?
@@ -812,8 +826,8 @@ function render() {
     elapsed:timeText(clock.totalMs),
     epiTime:s.lastEpiAt===null?"NO NEED":timeText(clock.epiMs),
     epiReminder:s.lastEpiAt===null?"FIRST DOSE NOT RECORDED":
-      s.phase==="rosc"?"ROSC • ไม่แจ้งเตือนยา":
-      s.lastEpiAt===null?"รอบันทึกยาครั้งแรก":clock.epiMs>=280000?"EPINEPHRINE DUE SOON / DUE":clock.epiMs>=240000?"4 MIN • READY":"SINCE LAST DOSE",
+      clock.epiMs>=280000?"EPINEPHRINE DUE SOON / DUE":
+      clock.epiMs>=240000?"4 MIN • READY":"SINCE LAST DOSE",
     shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm==="VT"?"pVT":s.rhythm,etco2:s.etco2===null?"—":s.etco2,
     episode:s.episode,ccf:clock.ccf===null?"—":clock.ccf.toFixed(1)+"%",
     pauseTotal:timeText(clock.pauseMs),room
@@ -957,15 +971,13 @@ function render() {
   const submit=document.getElementById("etco2Submit");
   entry.disabled=!connected || !s.advancedAirway || s.phase==="standby";
   submit.disabled=entry.disabled || actionCooldownRemaining(s,"etco2",Date.now())>0 || pendingActions.has("etco2");
-  const startButton=document.getElementById("startButton");
-  const roscAction=["running","paused"].includes(s.phase);
-  startButton.dataset.action=roscAction?"rosc":"start";
-  startButton.textContent=roscAction?"♥ ROSC":s.phase==="rosc"?"▶ Re-CPR":"▶ START CPR";
-  startButton.classList.toggle("rosc",roscAction);
-  startButton.classList.toggle("start",!roscAction);
-  startButton.disabled=!connected ||
-    (roscAction?pendingActions.has("rosc"):pendingActions.has("start")) ||
-    actionCooldownRemaining(s,roscAction?"rosc":"start",Date.now())>0;
+  // TV HTML retains its hidden legacy controller button; the Remote has no
+  // ordinary-screen START/ROSC control, only stage-specific buttons.
+  const legacyStartButton=document.getElementById("startButton");
+  if(legacyStartButton){
+    legacyStartButton.hidden=true;
+    legacyStartButton.disabled=true;
+  }
   const hint=document.getElementById("connectionHint");
   hint.textContent=!connected?"OFFLINE — ข้อมูล/เสียงเตือนอาจไม่ล่าสุด":
     s.phase==="standby"?"ONLINE — รอ Start CPR จาก Controller":
@@ -1124,11 +1136,14 @@ async function enterRoom(value) {
   room=roomClean(value);
   pendingShock=false;
   pendingActions.clear();
+  roscReviewOpen=false;
   messages=new Map();
   nearAlarmKey=cycleEndKey=epiAlarmKey="";
   if ("speechSynthesis" in window)speechSynthesis.cancel();
-  document.getElementById("roomInput").value=room;
-  document.getElementById("roomLabel").textContent=room;
+  const newRoomInput=document.getElementById("roomInput");
+  const newRoomLabel=document.getElementById("roomLabel");
+  if(newRoomInput)newRoomInput.value=room;
+  if(newRoomLabel)newRoomLabel.textContent=room;
   const url=new URL(location.href);
   url.searchParams.set("room",room);
   history.replaceState({},"",url.toString());
@@ -1380,17 +1395,38 @@ async function exportTimelinePDF(){
 }
 
 document.getElementById("exportPdfBtn").addEventListener("click",exportTimelinePDF);
-document.getElementById("joinRoomBtn").addEventListener("click",()=>enterRoom(document.getElementById("roomInput").value));
-document.getElementById("roomInput").addEventListener("keydown",e=>{
-  if (e.key==="Enter")enterRoom(e.currentTarget.value);
-});
+const joinRoomBtn=document.getElementById("joinRoomBtn");
+const editableRoomInput=document.getElementById("roomInput");
+if(joinRoomBtn && editableRoomInput){
+  joinRoomBtn.addEventListener("click",()=>enterRoom(editableRoomInput.value));
+  editableRoomInput.addEventListener("keydown",e=>{
+    if(e.key==="Enter")enterRoom(e.currentTarget.value);
+  });
+}
 document.getElementById("copyTvLink").addEventListener("click",shareTvLink);
 document.getElementById("copyControlLink").addEventListener("click",()=>copyLink("controller"));
+// Review checklist locally first; only one tap on the Confirm button
+// commits ROSC. No additional browser confirmation dialog.
+if(!tvMode){
+  document.getElementById("stageRoscPromptBtn").addEventListener("click",()=>{
+    const s=computeState();
+    if(!connected || !["running","paused"].includes(s.phase))return;
+    roscReviewOpen=true;
+    render();
+  });
+  document.getElementById("stageRoscBackBtn").addEventListener("click",()=>{
+    roscReviewOpen=false;
+    render();
+  });
+  document.getElementById("stageRoscConfirmBtn").addEventListener("click",()=>{
+    const s=computeState();
+    if(!roscReviewOpen || !connected || !["running","paused"].includes(s.phase))return;
+    void handleAction("rosc");
+  });
+}
 document.querySelectorAll("[data-action]").forEach(btn=>
   btn.addEventListener("click",()=>{
     const action=btn.dataset.action;
-    if(action==="rosc" &&
-       !confirm("ยืนยัน ROSC? จะสิ้นสุดช่วง CPR และแสดง Post-ROSC checklist"))return;
     if(action==="reset"){
       const state=computeState(),measurement=elapsedFor(state,Date.now());
       const fraction=measurement.ccf===null?"—":measurement.ccf.toFixed(1)+"%";
