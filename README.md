@@ -286,3 +286,14 @@ guaranteed and no patient information should be stored.
 - Controller/TV event reduction recognizes the new `charge`, `clear`, and `adjunct` actions, preserving event timestamps in the shared session.
 
 **Clinical caveat:** Continue compressions during charging where appropriate and minimize both pre- and post-shock interruptions. The app uses an expressly user-configured demonstration sequence; it is not validated for clinical decision support and must never delay treatment, enforce medication timing, or store identifiable patient information.
+
+
+## V1.4 — ROSC checklist confirmation, single Re-arrest action and compact Remote
+
+- **ROSC moved to the large EKG/Rhythm selection stage** (initial rhythm selection and the automatic two-minute rhythm check). It is removed from the normal Remote control grid.
+- Tapping **ROSC** first opens a dedicated seven-item **Post-arrest Checklist** on the Controller: pulse/ECG rhythm, 12-lead ECG, full V/S, neurological status/GCS, airway/oxygenation/ventilation/EtCO₂, perfusion/hemodynamics, and CXR when indicated. The operator taps **CONFIRM ROSC · END CPR EPISODE** once to record the ROSC event; this confirmation is not followed by an extra browser dialog. A Back option returns to Rhythm selection without ending CPR.
+- Once confirmed, the Controller's main content becomes **one large RE-ARREST · START CPR** action (plus the separate top utility toolbar). This starts the next CPR episode with a fresh four-choice Rhythm selection. It is immediately available when needed and does not inherit the old 5-second START cooldown.
+- **Epinephrine elapsed time continues through ROSC**, and drug doses/counts, adjunct logs, shock totals, and overall case time persist across episodes. Restarting CPR resets only episode-specific cycle/rhythm and shock-flow state. The CCF denominator still excludes documented ROSC intervals.
+- **105 BPM ON/OFF** and **RESET** controls are moved to a compact bar at the top of the mobile Remote. The Remote's **ROOM / Session** box and onboarding room label have been removed; session selection continues through the `room` URL parameter. The obsolete Remote subtitle has also been removed.
+- The remaining medication, airway and pause/resume controls are enlarged to take advantage of the freed mobile screen space. The TV layout keeps its existing room/session identity and monitor functionality.
+- The demo remains a manually reported event simulation, not a clinical CPR monitor or validated treatment protocol.
