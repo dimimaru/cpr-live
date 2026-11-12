@@ -718,42 +718,83 @@ function renderAirwayAndRhythm(s) {
   document.getElementById("co2Warning").hidden=!low;
   document.getElementById("co2Stat").classList.toggle("low-co2",low);
 }
+function nextMedication(s,clock){
+  const active=["running","paused"].includes(s.phase);
+  if(!active)return "none";
+  const epiEligible=s.fromNonShockable || (SHOCKABLE_RHYTHMS.has(s.rhythm) && s.shock>=2);
+  const epiAvailable=epiEligible &&
+    (s.lastEpiAt===null || clock.epiMs>=EPI_COOLDOWN_MS);
+  const amio=amiodaroneStatus(s);
+  // One slot only: Epi at shock 2 (or first nonshockable), then
+  // an eligible antiarrhythmic when appropriate. Later Epi reminders
+  // take precedence at 5 minutes since the most recent Epi.
+  const overdueEpi=epiAvailable && s.lastEpiAt!==null && clock.epiMs>=FIVE_MIN;
+  if(overdueEpi)return "epi";
+  if(amio.available && (s.epi>0 || !epiAvailable))return "amio";
+  if(epiAvailable)return "epi";
+  if(amio.available)return "amio";
+  if(amio.prepare)return "prepare";
+  return "none";
+}
 function renderControllerStage(s) {
   if(tvMode)return;
   const cyclePaused=s.phase==="paused" && s.pauseReason==="cycle";
   const choosing=["running","paused"].includes(s.phase) && s.rhythm==="—";
+  const flow=s.shockFlow;
   const stage=s.phase==="standby"?"start":
+    flow==="decision"?"decision":
+    flow==="charging"?"charging":
+    flow==="readyShock"?"shock":
+    flow==="postShock"?"resume":
     cyclePaused?(s.pauseRhythmRecorded?"resume":"rhythm"):
     choosing?"rhythm":"normal";
-  document.body.classList.toggle("remote-stage-start",stage==="start");
-  document.body.classList.toggle("remote-stage-rhythm",stage==="rhythm");
-  document.body.classList.toggle("remote-stage-normal",stage==="normal");
-  document.body.classList.toggle("remote-stage-resume",stage==="resume");
-  const panel=document.getElementById("onboardingStage");
-  panel.hidden=stage==="normal";
-  document.getElementById("stageStartScreen").hidden=stage!=="start";
-  document.getElementById("stageRhythmScreen").hidden=stage!=="rhythm";
-  document.getElementById("stageResumeScreen").hidden=stage!=="resume";
+  for(const item of ["start","rhythm","normal","resume","decision","charging","shock"]){
+    document.body.classList.toggle("remote-stage-"+item,stage===item);
+  }
+  document.getElementById("onboardingStage").hidden=stage==="normal";
+  for(const [screen,kind] of [
+    ["stageStartScreen","start"],["stageRhythmScreen","rhythm"],
+    ["stageShockDecisionScreen","decision"],["stageChargingScreen","charging"],
+    ["stageShockScreen","shock"],["stageResumeScreen","resume"]
+  ])document.getElementById(screen).hidden=stage!==kind;
   document.getElementById("stageRoomLabel").textContent=room;
   document.getElementById("stageRhythmHeading").textContent=cyclePaused?
     "IDENTIFY RHYTHM":"SELECT RHYTHM";
   document.getElementById("stageRhythmClock").textContent=cyclePaused?
     "CPR PAUSED • SELECT RHYTHM":"CPR TIMER IS RUNNING";
-  const resumeButton=document.getElementById("stageResumeBtn");
-  const pauseMs=cyclePaused?Math.max(0,Date.now()-s.pausedAt):0;
+  const clearTimer=["readyShock","postShock"].includes(flow);
+  const clockBase=clearTimer?s.clearAt:s.pausedAt;
+  const clearMs=clearTimer&&clockBase!==null?Math.max(0,Date.now()-clockBase):0;
+  const pauseMs=s.phase==="paused"&&s.pausedAt!==null?
+    Math.max(0,Date.now()-s.pausedAt):0;
+  const countdown=clearTimer?clearMs:pauseMs;
+  const elapsedText="HANDS-OFF "+(pauseMs/1000).toFixed(1)+" s";
   document.getElementById("stageResumeCountdown").textContent=
-    (Math.max(0,3000-pauseMs)/1000).toFixed(1)+" s";
-  document.getElementById("stageResumeElapsed").textContent=
-    "HANDS-OFF "+(pauseMs/1000).toFixed(1)+" s";
-  resumeButton.classList.toggle("critical",pauseMs>=3000);
-  resumeButton.disabled=!connected || !cyclePaused || !s.pauseRhythmRecorded ||
+    (Math.max(0,3000-countdown)/1000).toFixed(1)+" s";
+  document.getElementById("stageResumeElapsed").textContent=elapsedText;
+  document.getElementById("stageResumeTimerTitle").textContent=clearTimer?
+    "PAUSE SINCE CLEAR · 3-SECOND TARGET":"RHYTHM CHECK · 3-SECOND TARGET";
+  document.getElementById("stageShockCountdown").textContent=
+    (Math.max(0,3000-clearMs)/1000).toFixed(1)+" s";
+  document.getElementById("stageShockElapsed").textContent=elapsedText;
+  const resumeButton=document.getElementById("stageResumeBtn");
+  resumeButton.classList.toggle("critical",countdown>=3000);
+  resumeButton.disabled=!connected || s.phase!=="paused" ||
+    (flow?flow!=="postShock":!cyclePaused || !s.pauseRhythmRecorded) ||
     pendingActions.has("resume") || actionCooldownRemaining(s,"resume",Date.now())>0;
-  const stageStart=document.getElementById("stageStartBtn");
-  stageStart.disabled=!connected || pendingActions.has("start");
-  // The four rhythm choices are in a separate large first-screen grid.
+  document.getElementById("shockButton").classList.toggle("critical",clearMs>=3000);
+  document.getElementById("stageStartBtn").disabled=
+    !connected || pendingActions.has("start");
   document.querySelectorAll(".stage-rhythm-button").forEach(btn=>{
     btn.disabled=!connected || pendingActions.has("rhythm") ||
       actionCooldownRemaining(s,"rhythm",Date.now())>0;
+  });
+  document.querySelectorAll('[data-action="charge"]').forEach(btn=>{
+    btn.disabled=!connected || flow!=="decision" || pendingActions.has("charge");
+  });
+  document.querySelectorAll('[data-action="clear"]').forEach(btn=>{
+    btn.disabled=!connected || !["decision","charging"].includes(flow) ||
+      pendingActions.has("clear");
   });
 }
 function render() {
@@ -832,7 +873,8 @@ function render() {
   const freshShockable=SHOCKABLE_RHYTHMS.has(s.rhythm) &&
     s.lastRhythmEventId!==null && s.lastRhythmEventId!==s.lastShockRhythmEventId;
   const arrestActive=["running","paused"].includes(s.phase);
-  shockButton.disabled=!connected || !arrestActive || shockLocked || pendingShock || !freshShockable;
+  shockButton.disabled=!connected || s.phase!=="paused" ||
+    s.shockFlow!=="readyShock" || shockLocked || pendingShock || !freshShockable;
   shockButton.classList.toggle("cooldown-locked",shockLocked || pendingShock);
   if(shockLocked){
     const seconds=Math.ceil(shockRemaining/1000);
@@ -858,7 +900,7 @@ function render() {
   pauseResume.dataset.action=resume?"resume":"pause";
   pauseResume.textContent=resume?"▶ RESUME CPR":"Ⅱ PAUSE CPR";
   pauseResume.classList.toggle("resume-flash",resume);
-  pauseResume.disabled=!connected ||
+  pauseResume.disabled=!connected || !!s.shockFlow ||
     !["running","paused"].includes(s.phase) ||
     actionCooldownRemaining(s,resume?"resume":"pause",Date.now())>0 ||
     pendingActions.has(resume?"resume":"pause");
@@ -866,13 +908,17 @@ function render() {
   metro.classList.toggle("active",s.metronomeOn);
   metro.setAttribute("aria-pressed",String(s.metronomeOn));
   metro.textContent="🎵 105 BPM "+(s.metronomeOn?"ON":"OFF");
+  const medication=nextMedication(s,clock);
   const epiControl=document.getElementById("epiControl");
-  const epiVisible=arrestActive && (s.fromNonShockable || s.shock>=2);
-  epiControl.hidden=!epiVisible;
+  epiControl.hidden=medication==="none" || !arrestActive;
   const epiButton=document.getElementById("epiButton");
+  const amioButton=document.getElementById("amioButton");
+  epiButton.hidden=medication!=="epi";
+  amioButton.hidden=!["amio","prepare"].includes(medication);
   const epiLockMs=actionCooldownRemaining(s,"epi",Date.now());
   const epiLocked=epiLockMs>0;
-  epiButton.disabled=!connected || !arrestActive || epiLocked || pendingActions.has("epi");
+  epiButton.disabled=!connected || !arrestActive || epiLocked ||
+    pendingActions.has("epi") || medication!=="epi";
   const epiState=epiColor(s,clock);
   epiButton.classList.toggle("epi-highlight",epiState==="green" && !epiLocked);
   epiButton.classList.toggle("epi-muted",epiState==="neutral" || epiLocked);
@@ -881,31 +927,26 @@ function render() {
   document.getElementById("epiStat").classList.toggle("epi-green",epiState==="green");
   document.getElementById("epiCountHalf").classList.toggle("epi-urgent",epiState==="red");
   document.getElementById("epiCountHalf").classList.toggle("epi-green",epiState==="green");
-  epiButton.classList.toggle("epi-locked",epiLocked);
   const epiHint=document.getElementById("epiLockHint");
-  if(epiLocked){
-    const seconds=Math.ceil(epiLockMs/1000);
-    const txt=fmt(Math.floor(seconds/60))+":"+fmt(seconds%60);
-    epiButton.textContent="❤️ EPINEPHRINE · "+txt;
-    epiHint.textContent="LOCKED "+txt+" (3 MIN BETWEEN LOGS)";
-    epiHint.hidden=false;
-  }else{
-    epiButton.textContent="❤️ EPINEPHRINE";
-    epiHint.hidden=true;
-  }
-  const amioButton=document.getElementById("amioButton");
+  epiHint.hidden=true;
+  epiButton.classList.toggle("epi-locked",epiLocked);
+  epiButton.textContent="❤️ EPINEPHRINE";
   const amio=amiodaroneStatus(s);
-  amioButton.hidden=!arrestActive || !amio.visible;
-  amioButton.textContent=amio.prepare?
+  amioButton.textContent=medication==="prepare"?
     "💉 เตรียม AMIODARONE "+amio.dose+" mg":
     "💉 AMIODARONE "+amio.dose+" mg";
   if(amio.dose===150 && amio.available && !amio.recommended)
     amioButton.textContent="💉 AMIODARONE 150 mg · บันทึกยาที่ให้จริง";
   amioButton.classList.toggle("amio-highlight",amio.recommended);
-  amioButton.classList.toggle("amio-prepare",amio.prepare);
-  amioButton.classList.toggle("amio-muted",!amio.recommended && !amio.prepare);
-  amioButton.disabled=!connected || !arrestActive || !amio.available ||
+  amioButton.classList.toggle("amio-prepare",medication==="prepare");
+  amioButton.classList.toggle("amio-muted",!amio.recommended && medication!=="prepare");
+  amioButton.disabled=!connected || medication!=="amio" || !arrestActive ||
     actionCooldownRemaining(s,"amio",Date.now())>0 || pendingActions.has("amio");
+  document.querySelectorAll('.adjunct-buttons button').forEach(btn=>{
+    btn.disabled=!connected || !arrestActive ||
+      actionCooldownRemaining(s,"adjunct",Date.now(),btn.dataset.value)>0 ||
+      pendingActions.has("adjunct");
+  });
   document.getElementById("clinicalCue").textContent=cue.cue+
     (s.phase==="rosc" && clock.ccf!==null?" • DOCUMENTED CCF "+clock.ccf.toFixed(1)+"%":"");
   document.getElementById("drugHint").textContent=cue.cue+
@@ -938,7 +979,7 @@ function render() {
   // Only the active Controller initiates an automatic log entry at the end of
   // the 2-minute cycle. Re-check phase and network guard inside handleAction.
   if(!tvMode && connected && s.phase==="running" && s.rhythm!=="—" &&
-     clock.cycleMs>=TWO_MIN && !pendingActions.has("pause")){
+     !s.shockFlow && clock.cycleMs>=TWO_MIN && !pendingActions.has("pause")){
     void handleAction("pause","cycle");
   }
   if(!tvMode){
@@ -995,16 +1036,23 @@ async function handleAction(type,value) {
   if (type==="pause" && s.phase!=="running")return;
   if (type==="resume" && s.phase!=="paused")return;
   if(type==="resume" && s.pauseReason==="cycle" && !s.pauseRhythmRecorded)return;
+  if(type==="resume" && s.shockFlow && s.shockFlow!=="postShock")return;
+  if(type==="charge" && s.shockFlow!=="decision")return;
+  if(type==="clear" && !["decision","charging"].includes(s.shockFlow))return;
+  if(type==="adjunct" && (!["running","paused"].includes(s.phase) || !ADJUNCT_NAMES[value]))return;
   if (type==="rosc" && !["running","paused"].includes(s.phase))return;
   if (type==="reset" && s.phase==="standby")return;
   if (["shock","epi","rhythm","peaWidth","etTube"].includes(type) && !["running","paused"].includes(s.phase))return;
   if(type==="shock"){
-    if(pendingShock || !SHOCKABLE_RHYTHMS.has(s.rhythm) ||
+    if(pendingShock || s.phase!=="paused" || s.shockFlow!=="readyShock" ||
+      !SHOCKABLE_RHYTHMS.has(s.rhythm) ||
       s.lastRhythmEventId===null ||
       s.lastRhythmEventId===s.lastShockRhythmEventId ||
       actionCooldownRemaining(s,"shock",Date.now())>0)return;
   }
-  if(type!=="shock" && actionCooldownRemaining(s,type,Date.now())>0)return;
+  if(type!=="shock" && actionCooldownRemaining(s,type,Date.now(),value)>0)return;
+  if(type==="epi" && nextMedication(s,elapsedFor(s,Date.now()))!=="epi")return;
+  if(type==="amio" && nextMedication(s,elapsedFor(s,Date.now()))!=="amio")return;
   if(pendingActions.has(type))return;
   if (type==="peaWidth" && s.rhythm!=="PEA")return;
   if (type==="etTube" && s.advancedAirway)return;
@@ -1339,6 +1387,8 @@ document.getElementById("copyControlLink").addEventListener("click",()=>copyLink
 document.querySelectorAll("[data-action]").forEach(btn=>
   btn.addEventListener("click",()=>{
     const action=btn.dataset.action;
+    if(action==="rosc" &&
+       !confirm("ยืนยัน ROSC? จะสิ้นสุดช่วง CPR และแสดง Post-ROSC checklist"))return;
     if(action==="reset"){
       const state=computeState(),measurement=elapsedFor(state,Date.now());
       const fraction=measurement.ccf===null?"—":measurement.ccf.toFixed(1)+"%";
