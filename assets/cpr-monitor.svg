@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs><linearGradient id="screen" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#062449"/><stop offset="1" stop-color="#03162f"/></linearGradient><linearGradient id="case" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#15ebea"/><stop offset="1" stop-color="#17bce8"/></linearGradient></defs>
+<rect width="512" height="512" rx="94" fill="#031637"/>
+<rect x="39" y="90" width="434" height="310" rx="39" fill="url(#screen)" stroke="url(#case)" stroke-width="17"/>
+<path d="M216 413 H296 L307 448 H205Z" fill="#18cde1"/><path d="M174 458 Q179 441 204 441 H308 Q333 441 338 458Z" fill="#28dbe3"/>
+<text x="255" y="143" font-family="Arial,Helvetica,sans-serif" font-size="53" font-weight="900" fill="#fff" text-anchor="middle">CPR</text>
+<rect x="313" y="107" width="121" height="48" rx="13" fill="#e32458"/>
+<text x="372" y="143" font-family="Arial,Helvetica,sans-serif" font-size="36" font-weight="900" fill="#fff" text-anchor="middle">LIVE</text>
+<path d="M63 224 H88 L100 210 L112 238 L126 167 L141 261 L157 208 L173 225 H192 L205 213 L216 235 L231 177 L245 256 L260 222 H282" fill="none" stroke="#3ce9ed" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M178 265 C145 232 110 250 107 276 C103 309 144 331 175 356 C210 326 249 309 246 277 C245 248 211 233 178 265Z" fill="#fff"/>
+<path d="M152 300 H163 L173 285 L184 315 L194 290 L204 300 H210" stroke="#072044" stroke-width="5" stroke-linecap="round"/>
+<rect x="289" y="181" width="147" height="52" rx="11" fill="#10354e" stroke="#26748c" stroke-width="3"/>
+<circle cx="319" cy="206" r="16" fill="none" stroke="#28e9e6" stroke-width="5"/>
+<path d="M319 191 V205 L328 212" stroke="#28e9e6" stroke-width="4" stroke-linecap="round"/>
+<text x="359" y="216" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="bold" fill="#fff">02:00</text>
+<rect x="289" y="245" width="147" height="49" rx="10" fill="#10354e" stroke="#26748c" stroke-width="3"/>
+<path d="M321 252 L308 274 H319 L316 288 L338 264 H326 L330 252Z" fill="#ffd64c"/>
+<text x="405" y="280" font-family="Arial,Helvetica,sans-serif" font-size="29" font-weight="bold" fill="#fff">1</text>
+<rect x="289" y="306" width="147" height="49" rx="10" fill="#10354e" stroke="#1ab2bb" stroke-width="3"/>
+<path d="M307 339 L321 323 M318 320 L327 329 M305 334 L315 344 M324 325 L337 313" stroke="#34ebdb" stroke-width="6" stroke-linecap="round"/>
+<text x="343" y="339" font-family="Arial,Helvetica,sans-serif" font-size="21" font-weight="bold" fill="#71f348">EPI 04:12</text>
+</svg>
