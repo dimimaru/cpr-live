@@ -1,4 +1,4 @@
-// CPR Live v1.0.3 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.1 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -101,6 +101,7 @@ function blankState() {
     epiAnchor:null,        // Time since CPR start or latest documented epinephrine.
     shock:0,lastShockAt:null,lastEpiAt:null,epi:0,amioDoses:[],
     rhythm:"—",lastRhythmEventId:null,lastShockRhythmEventId:null,
+    fromNonShockable:false,
     peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,coachAnchor:null,
     metronomeOn:true,lastActionAt:{},timeline:[]
   };
@@ -141,6 +142,7 @@ function computeState() {
       s.rhythm="—";
       s.lastRhythmEventId=null;
       s.lastShockRhythmEventId=null;
+      s.fromNonShockable=false; // Re-arrest begins a new rhythm pathway.
       s.peaWidth=null;
       if(s.advancedAirway)s.ventAnchor=t; // Re-arrest: start a new 6-second breath cycle.
       // When no epinephrine has been recorded, the first/next arrest starts the
@@ -190,13 +192,18 @@ function computeState() {
         line(s,e,"EPINEPHRINE #"+s.epi);
       }
     } else if (["running","paused"].includes(s.phase) && e.type === "amio" &&
+      SHOCKABLE_RHYTHMS.has(s.rhythm) &&
       (e.value===300||e.value===150) &&
-      s.amioDoses.length<2 && e.value===(s.amioDoses.length===0?300:150)) {
+      s.amioDoses.length<2 &&
+      e.value===(s.amioDoses.length===0?300:150) &&
+      s.shock >= amiodaroneMinimumShock(s,e.value)) {
+      // Apply the same branch-dependent guard to received events as to UI clicks.
       s.amioDoses.push(e.value);
       line(s,e,"AMIODARONE "+e.value+" mg");
     } else if (["running","paused"].includes(s.phase) && e.type === "rhythm" &&
       ["VF","VT","PEA","Asystole"].includes(e.value)) {
       s.rhythm=e.value;
+      if(e.value==="PEA" || e.value==="Asystole")s.fromNonShockable=true;
       s.lastRhythmEventId=e.id;
       s.peaWidth=null;
       line(s,e,"RHYTHM: "+(s.rhythm==="VT"?"pVT":s.rhythm));
@@ -289,7 +296,8 @@ function soundNotice(text,urgent=false) {
   speak(text,urgent);
 }
 function shockAdvice(s) {
-  if(s.shock===2)return "เตรียมอามิโอดาโรน สามร้อยมิลลิกรัม";
+  if(s.shock===2)return s.fromNonShockable?
+    "อามิโอดาโรน สามร้อยมิลลิกรัม":"เตรียมอามิโอดาโรน สามร้อยมิลลิกรัม";
   if(s.shock===3)return "พิจารณาอามิโอดาโรน สามร้อยมิลลิกรัม";
   if(s.shock===4)return "เตรียมอามิโอดาโรน หนึ่งร้อยห้าสิบมิลลิกรัม";
   if(s.shock===5)return "พิจารณาอามิโอดาโรน หนึ่งร้อยห้าสิบมิลลิกรัม";
@@ -385,10 +393,23 @@ function updateMetronome(s) {
     count++;
   }
 }
+function amiodaroneMinimumShock(s,dose){
+  return dose===300?(s.fromNonShockable?2:3):4;
+}
+function amiodaroneStatus(s){
+  const dose=s.amioDoses.length===0?300:150;
+  const shockable=SHOCKABLE_RHYTHMS.has(s.rhythm);
+  const alreadyComplete=s.amioDoses.length>=2;
+  const visible=shockable && !alreadyComplete && s.shock>=2;
+  const min=amiodaroneMinimumShock(s,dose);
+  const available=visible && s.shock>=min;
+  const prepare=visible && !available;
+  const recommended=available && s.shock>=(dose===300?min:5);
+  return {dose,visible,available,prepare,recommended};
+}
 function medicationCue(s,clock){
   const shockable=["VF","VT"].includes(s.rhythm);
-  const epiReady=["PEA","Asystole"].includes(s.rhythm) ||
-    (shockable && s.shock>=2);
+  const epiReady=s.fromNonShockable || (shockable && s.shock>=2);
   const amioCount=s.amioDoses.length;
   let cue="";
   if(s.phase==="standby")cue="รอ START CPR — เริ่มแล้วบันทึก Rhythm โดยเร็ว";
@@ -400,7 +421,9 @@ function medicationCue(s,clock){
   } else if(s.rhythm==="Asystole"){
     cue="ASYSTOLE — FLAT-LINE PROTOCOL: ตรวจสาย/ขั้วไฟฟ้า, gain, ยืนยัน 2 leads และประเมิน fine VF; CPR ต่อเนื่อง, ไม่ช็อกเมื่อยืนยันแล้ว";
   } else if(s.shock<2)cue=s.rhythm+" · Shock #"+s.shock+" — เน้น Defibrillation ก่อน; Epinephrine ยังไม่เน้น";
-  else if(s.shock===2)cue="Shock #2 — ประเมิน Epinephrine; เตรียม Amiodarone 300 mg สำหรับหลัง Shock #3";
+  else if(s.shock===2)cue=s.fromNonShockable?
+    "Shock #2 หลัง Nonshockable — สามารถบันทึก Amiodarone 300 mg ตาม Protocol ที่ทีมเลือก":
+    "Shock #2 — Epinephrine / เตรียม Amiodarone 300 mg";
   else if(amioCount===0)cue="Shock #"+s.shock+" — พิจารณา Amiodarone 300 mg หากยัง VF/pVT";
   else if(amioCount===1 && s.shock===4)cue="Shock #4 — เตรียม Amiodarone 150 mg; ERC 2025 ระบุพิจารณาหลัง Shock #5";
   else if(amioCount===1 && s.shock>=5)cue="Shock #"+s.shock+" — พิจารณา Amiodarone 150 mg (ขนาดที่สอง) ตาม protocol";
@@ -594,6 +617,26 @@ function renderAirwayAndRhythm(s) {
   document.getElementById("co2Warning").hidden=!low;
   document.getElementById("co2Stat").classList.toggle("low-co2",low);
 }
+function renderControllerStage(s) {
+  if(tvMode)return;
+  const choosing=["running","paused"].includes(s.phase) && s.rhythm==="—";
+  const stage=s.phase==="standby"?"start":choosing?"rhythm":"normal";
+  document.body.classList.toggle("remote-stage-start",stage==="start");
+  document.body.classList.toggle("remote-stage-rhythm",stage==="rhythm");
+  document.body.classList.toggle("remote-stage-normal",stage==="normal");
+  const panel=document.getElementById("onboardingStage");
+  panel.hidden=stage==="normal";
+  document.getElementById("stageStartScreen").hidden=stage!=="start";
+  document.getElementById("stageRhythmScreen").hidden=stage!=="rhythm";
+  document.getElementById("stageRoomLabel").textContent=room;
+  const stageStart=document.getElementById("stageStartBtn");
+  stageStart.disabled=!connected || pendingActions.has("start");
+  // The four rhythm choices are in a separate large first-screen grid.
+  document.querySelectorAll(".stage-rhythm-button").forEach(btn=>{
+    btn.disabled=!connected || pendingActions.has("rhythm") ||
+      actionCooldownRemaining(s,"rhythm",Date.now())>0;
+  });
+}
 function render() {
   const s=computeState();
   const clock=elapsedFor(s,Date.now());
@@ -704,6 +747,9 @@ function render() {
   metro.classList.toggle("active",s.metronomeOn);
   metro.setAttribute("aria-pressed",String(s.metronomeOn));
   metro.textContent="🎵 105 BPM "+(s.metronomeOn?"ON":"OFF");
+  const epiControl=document.getElementById("epiControl");
+  const epiVisible=arrestActive && (s.fromNonShockable || s.shock>=2);
+  epiControl.hidden=!epiVisible;
   const epiButton=document.getElementById("epiButton");
   const epiLockMs=actionCooldownRemaining(s,"epi",Date.now());
   const epiLocked=epiLockMs>0;
@@ -729,17 +775,17 @@ function render() {
     epiHint.hidden=true;
   }
   const amioButton=document.getElementById("amioButton");
-  const amio300=cue.amioCount===0;
-  amioButton.textContent=amio300?"💉 AMIODARONE 300 mg":"💉 AMIODARONE 150 mg";
-  const amioReady=cue.shockable && s.shock >= (amio300?3:5);
-  const amioPrep=cue.shockable && ((amio300 && s.shock===2) ||
-    (!amio300 && s.shock>=4 && s.shock<5));
-  if(!amio300 && amioPrep)amioButton.textContent="💉 AMIODARONE 150 mg · เตรียม";
-  amioButton.classList.toggle("amio-highlight",amioReady);
-  amioButton.classList.toggle("amio-prepare",amioPrep);
-  amioButton.classList.toggle("amio-muted",!amioReady && !amioPrep);
-  amioButton.disabled=!connected || !["running","paused"].includes(s.phase) ||
-    !cue.shockable || cue.amioCount>=2 || s.shock < (amio300?3:4) ||
+  const amio=amiodaroneStatus(s);
+  amioButton.hidden=!arrestActive || !amio.visible;
+  amioButton.textContent=amio.prepare?
+    "💉 เตรียม AMIODARONE "+amio.dose+" mg":
+    "💉 AMIODARONE "+amio.dose+" mg";
+  if(amio.dose===150 && amio.available && !amio.recommended)
+    amioButton.textContent="💉 AMIODARONE 150 mg · บันทึกยาที่ให้จริง";
+  amioButton.classList.toggle("amio-highlight",amio.recommended);
+  amioButton.classList.toggle("amio-prepare",amio.prepare);
+  amioButton.classList.toggle("amio-muted",!amio.recommended && !amio.prepare);
+  amioButton.disabled=!connected || !arrestActive || !amio.available ||
     actionCooldownRemaining(s,"amio",Date.now())>0 || pendingActions.has("amio");
   document.getElementById("clinicalCue").textContent=cue.cue+
     (s.phase==="rosc" && clock.ccf!==null?" • DOCUMENTED CCF "+clock.ccf.toFixed(1)+"%":"");
@@ -750,12 +796,20 @@ function render() {
   entry.disabled=!connected || !s.advancedAirway || s.phase==="standby";
   submit.disabled=entry.disabled || actionCooldownRemaining(s,"etco2",Date.now())>0 || pendingActions.has("etco2");
   const startButton=document.getElementById("startButton");
-  startButton.textContent=s.phase==="rosc"?"▶ RE-ARREST / START CPR":"▶ START CPR";
+  const roscAction=["running","paused"].includes(s.phase);
+  startButton.dataset.action=roscAction?"rosc":"start";
+  startButton.textContent=roscAction?"♥ ROSC":s.phase==="rosc"?"▶ Re-CPR":"▶ START CPR";
+  startButton.classList.toggle("rosc",roscAction);
+  startButton.classList.toggle("start",!roscAction);
+  startButton.disabled=!connected ||
+    (roscAction?pendingActions.has("rosc"):pendingActions.has("start")) ||
+    actionCooldownRemaining(s,roscAction?"rosc":"start",Date.now())>0;
   const hint=document.getElementById("connectionHint");
   hint.textContent=!connected?"OFFLINE — ข้อมูล/เสียงเตือนอาจไม่ล่าสุด":
     s.phase==="standby"?"ONLINE — รอ Start CPR จาก Controller":
     s.phase==="rosc"?"ONLINE — ROSC • TOTAL CASE TIME STILL RUNNING":
     s.phase==="paused"?"ONLINE — COMPRESSIONS INTERRUPTED • CLOCK CONTINUES":"ONLINE — REALTIME CPR SESSION";
+  renderControllerStage(s);
   renderAirwayAndRhythm(s);
   renderVentilation(s,clock);
   renderECG(s);
@@ -832,7 +886,7 @@ async function handleAction(type,value) {
     if(!["VF","VT"].includes(s.rhythm) || !["running","paused"].includes(s.phase) ||
       s.amioDoses.length>=2)return;
     const next=s.amioDoses.length===0?300:150;
-    if(s.shock<(next===300?3:4))return;
+    if(s.shock<amiodaroneMinimumShock(s,next))return;
     // The ERC 2025 guidance places the second dose after five shocks.
     // After shock four, keep a manual override for documenting a dose
     // actually administered by the clinician; never imply it is due.
