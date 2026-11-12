@@ -1,4 +1,4 @@
-// CPR Live v1.1 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.2 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -94,6 +94,8 @@ function blankState() {
     cycleAnchor:null,      // Per-episode CPR cycle elapsed, adjusted for pauses.
     pausedAt:null,
     pauseId:null,
+    pauseReason:null,
+    pauseRhythmRecorded:false,
     pauseAccruedMs:0,
     arrestAccruedMs:0,
     episodeStartAt:null,
@@ -139,27 +141,36 @@ function computeState() {
       s.frozenCycleMs=0;
       s.pausedAt=null;
       s.pauseId=null;
+      s.pauseReason=null;
+      s.pauseRhythmRecorded=false;
       s.rhythm="—";
       s.lastRhythmEventId=null;
       s.lastShockRhythmEventId=null;
       s.fromNonShockable=false; // Re-arrest begins a new rhythm pathway.
       s.peaWidth=null;
       if(s.advancedAirway)s.ventAnchor=t; // Re-arrest: start a new 6-second breath cycle.
-      // When no epinephrine has been recorded, the first/next arrest starts the
-      // 4-minute demo timer. After a dose it tracks elapsed wall time since it.
-      if (!s.epi) s.epiAnchor=t;
+      // The epinephrine clock starts only on a documented dose.
+      // Before a dose the TV displays "NO NEED".
       line(s,e,recurrent?"RE-ARREST — START CPR #"+s.episode:"START CPR");
     } else if (e.type === "pause" && s.phase === "running") {
       // Compression interruption does NOT stop the 2-min cycle or epinephrine clock.
       s.pausedAt=t;
       s.pauseId=e.id;
+      s.pauseReason=e.value==="cycle"?"cycle":"manual";
+      s.pauseRhythmRecorded=false;
       s.phase="paused";
-      line(s,e,"PAUSE CHEST COMPRESSIONS");
+      line(s,e,s.pauseReason==="cycle"?"2-MIN CYCLE — PAUSE FOR RHYTHM":"PAUSE CHEST COMPRESSIONS");
     } else if (e.type === "resume" && s.phase === "paused") {
       const interruption=Math.max(0,t-s.pausedAt);
       s.pauseAccruedMs+=interruption;
+      if(s.pauseReason==="cycle"){
+        if(!s.pauseRhythmRecorded)continue; // Require rhythm selection before resuming this cycle.
+        s.cycleAnchor=t; // Next 2-minute cycle begins after Resume.
+      }
       s.pausedAt=null;
       s.pauseId=null;
+      s.pauseReason=null;
+      s.pauseRhythmRecorded=false;
       s.phase="running";
       s.coachAnchor=t;
       line(s,e,"RESUME COMPRESSIONS — interruption "+timeText(interruption));
@@ -170,6 +181,8 @@ function computeState() {
       s.frozenCycleMs=Math.max(0,t-s.cycleAnchor);
       s.pausedAt=null;
       s.pauseId=null;
+      s.pauseReason=null;
+      s.pauseRhythmRecorded=false;
       s.phase="rosc";
       line(s,e,"ROSC — CPR STOPPED");
     } else if (["running","paused"].includes(s.phase) && e.type === "shock") {
@@ -205,6 +218,7 @@ function computeState() {
       s.rhythm=e.value;
       if(e.value==="PEA" || e.value==="Asystole")s.fromNonShockable=true;
       s.lastRhythmEventId=e.id;
+      if(s.phase==="paused" && s.pauseReason==="cycle")s.pauseRhythmRecorded=true;
       s.peaWidth=null;
       line(s,e,"RHYTHM: "+(s.rhythm==="VT"?"pVT":s.rhythm));
     } else if (["running","paused"].includes(s.phase) && e.type === "peaWidth" &&
@@ -315,7 +329,7 @@ function announceEvent(e,s) {
     rhythm:e.value==="VF"?"วีเอฟ":e.value==="VT"?"พีวีที":
       e.value==="PEA"?"พีอีเอ เลือกคิวอาร์เอส ทำพีโอคัส":"แอสซิสโตลี แฟลตไลน์โปรโตคอล",
     peaWidth:e.value==="Wide"?"ไวด์คิวอาร์เอส":"แนโรคิวอาร์เอส",
-    etTube:"ใส่ท่อแล้ว",
+    etTube:"ใส่ท่อแล้ว ติด ซีโอทู มอนิเตอร์",
     rosc:"อาร์โอเอสซี ตรวจอีเคจี เอกซเรย์ปอด วัดไวทัลไซน์ ประเมินจีซีเอส",
     etco2:"ซีโอทู "+e.value+(e.value<10?" ตรวจคุณภาพซีพีอาร์":"")
   };
@@ -335,7 +349,7 @@ function maskCoach(s,now){
 }
 function epiColor(s,clock){
   if(!["running","paused"].includes(s.phase))return "neutral";
-  if(s.lastEpiAt===null)return medicationCue(s).epiReady?"green":"neutral";
+  if(s.lastEpiAt===null)return "neutral";
   if(clock.epiMs>=FIVE_MIN-EPI_PREWARN_MS)return "red";
   return clock.epiMs>=FOUR_MIN?"green":"neutral";
 }
@@ -619,16 +633,34 @@ function renderAirwayAndRhythm(s) {
 }
 function renderControllerStage(s) {
   if(tvMode)return;
+  const cyclePaused=s.phase==="paused" && s.pauseReason==="cycle";
   const choosing=["running","paused"].includes(s.phase) && s.rhythm==="—";
-  const stage=s.phase==="standby"?"start":choosing?"rhythm":"normal";
+  const stage=s.phase==="standby"?"start":
+    cyclePaused?(s.pauseRhythmRecorded?"resume":"rhythm"):
+    choosing?"rhythm":"normal";
   document.body.classList.toggle("remote-stage-start",stage==="start");
   document.body.classList.toggle("remote-stage-rhythm",stage==="rhythm");
   document.body.classList.toggle("remote-stage-normal",stage==="normal");
+  document.body.classList.toggle("remote-stage-resume",stage==="resume");
   const panel=document.getElementById("onboardingStage");
   panel.hidden=stage==="normal";
   document.getElementById("stageStartScreen").hidden=stage!=="start";
   document.getElementById("stageRhythmScreen").hidden=stage!=="rhythm";
+  document.getElementById("stageResumeScreen").hidden=stage!=="resume";
   document.getElementById("stageRoomLabel").textContent=room;
+  document.getElementById("stageRhythmHeading").textContent=cyclePaused?
+    "IDENTIFY RHYTHM":"SELECT RHYTHM";
+  document.getElementById("stageRhythmClock").textContent=cyclePaused?
+    "CPR PAUSED • SELECT RHYTHM":"CPR TIMER IS RUNNING";
+  const resumeButton=document.getElementById("stageResumeBtn");
+  const pauseMs=cyclePaused?Math.max(0,Date.now()-s.pausedAt):0;
+  document.getElementById("stageResumeCountdown").textContent=
+    (Math.max(0,3000-pauseMs)/1000).toFixed(1)+" s";
+  document.getElementById("stageResumeElapsed").textContent=
+    "HANDS-OFF "+(pauseMs/1000).toFixed(1)+" s";
+  resumeButton.classList.toggle("critical",pauseMs>=3000);
+  resumeButton.disabled=!connected || !cyclePaused || !s.pauseRhythmRecorded ||
+    pendingActions.has("resume") || actionCooldownRemaining(s,"resume",Date.now())>0;
   const stageStart=document.getElementById("stageStartBtn");
   stageStart.disabled=!connected || pendingActions.has("start");
   // The four rhythm choices are in a separate large first-screen grid.
@@ -648,8 +680,8 @@ function render() {
       s.phase==="rosc"?"ROSC — MONITORING":"STANDBY",
     cycle:timeText(currentCycle),
     elapsed:timeText(clock.totalMs),
-    epiTime:s.epiAnchor===null?"00:00":timeText(clock.epiMs),
-    epiReminder:s.epiAnchor===null?"รอเริ่ม CPR":
+    epiTime:s.lastEpiAt===null?"NO NEED":timeText(clock.epiMs),
+    epiReminder:s.lastEpiAt===null?"WAIT FOR FIRST RECORDED DOSE":
       s.phase==="rosc"?"ROSC • ไม่แจ้งเตือนยา":
       s.lastEpiAt===null?"รอบันทึกยาครั้งแรก":clock.epiMs>=280000?"EPINEPHRINE DUE SOON / DUE":clock.epiMs>=240000?"4 MIN • READY":"SINCE LAST DOSE",
     shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm==="VT"?"pVT":s.rhythm,etco2:s.etco2===null?"—":s.etco2,
@@ -815,6 +847,12 @@ function render() {
   renderECG(s);
   renderInterruption(s,clock);
   checkAlarms(s,clock);
+  // Only the active Controller initiates an automatic log entry at the end of
+  // the 2-minute cycle. Re-check phase and network guard inside handleAction.
+  if(!tvMode && connected && s.phase==="running" && s.rhythm!=="—" &&
+     clock.cycleMs>=TWO_MIN && !pendingActions.has("pause")){
+    void handleAction("pause","cycle");
+  }
   if(!tvMode){
     document.getElementById("exportPdfBtn").disabled=s.timeline.length===0;
   }
@@ -867,6 +905,7 @@ async function handleAction(type,value) {
   if (type==="start" && !["standby","rosc"].includes(s.phase))return;
   if (type==="pause" && s.phase!=="running")return;
   if (type==="resume" && s.phase!=="paused")return;
+  if(type==="resume" && s.pauseReason==="cycle" && !s.pauseRhythmRecorded)return;
   if (type==="rosc" && !["running","paused"].includes(s.phase))return;
   if (type==="reset" && s.phase==="standby")return;
   if (["shock","epi","rhythm","peaWidth","etTube"].includes(type) && !["running","paused"].includes(s.phase))return;
