@@ -297,3 +297,22 @@ guaranteed and no patient information should be stored.
 - **105 BPM ON/OFF** and **RESET** controls are moved to a compact bar at the top of the mobile Remote. The Remote's **ROOM / Session** box and onboarding room label have been removed; session selection continues through the `room` URL parameter. The obsolete Remote subtitle has also been removed.
 - The remaining medication, airway and pause/resume controls are enlarged to take advantage of the freed mobile screen space. The TV layout keeps its existing room/session identity and monitor functionality.
 - The demo remains a manually reported event simulation, not a clinical CPR monitor or validated treatment protocol.
+
+
+## V1.5 — Dynamic reversible-cause tools, adjunct dose records and post-ROSC dashboard
+
+- **Amiodarone 150 mg**: when its existing project-specific fourth-shock documentation threshold is met, the button is highlighted in the same way as 300 mg, and there is **no extra browser confirmation**. This is only a medication log; it does not administer or prescribe treatment. The fourth-shock threshold is a local prototype rule and does not represent universal resuscitation guidance.
+- **Additional records**: added **PRC · 1 unit**. The **7.5% NaHCO₃** button now opens a two-choice amount selector (**1 amp / 2 amp**); the actual amount is recorded in the Timeline and exported PDF. Existing Calcium, Glucose and Lidocaine logs remain. Newly created labels no longer contain an **ADJUNCT:** prefix. Previously broadcast labels are preserved as historical event text; the current session is ephemeral.
+- **Progressive disclosure for PEA/Asystole only**: a single **POCUS / REVERSIBLE CAUSES** menu reveals three tabs:
+  - **POCUS**: possible pseudo-PEA versus no observed cardiac motion, tamponade, hypovolemia pattern, left/right lung pneumothorax concerns, RV strain, and free abdominal fluid/eFAST. These are assessment findings, not automatically diagnosed etiologies. RV dilatation alone must not diagnose PE, and absence of observed cardiac activity alone must not decide termination.
+  - **LAB**: VBG/ABG (acid-base), K, glucose, ionized Ca, Mg, Hb/Hct, lactate and core temperature. Checkboxes mean *reviewed/assessed*, not normal results and not laboratory orders.
+  - **TRAUMA**: eFAST and hemorrhage assessment plus separately logged **ICD Lt** and **ICD Rt** procedures. Each completed ICD entry requires confirmation, is recorded once per arrest episode, and cannot be clicked again in that episode. The buttons do not imply clinical indication.
+- Each checklist selection/deselection is timestamped in the event Timeline and included in the existing PDF exporter. The POCUS and Trauma selections reset when the next Re-arrest episode starts, while the full Timeline is retained.
+- **After ROSC**, the Controller now has a compact **RE-ARREST · START CPR** button and separate **REPORT PDF** and **DASHBOARD** buttons. PDF uses the existing A4 timeline report implementation. Dashboard displays live figures for episodes, shocks, Epinephrine, Amiodarone, total case time, CPR time, recorded hands-off time, and a CCF ring chart, along with a color-coded rhythm bar chart and recorded adjunct/procedure counts. Both dashboard and PDF are derived from the same session events. The dashboard provides a back button to return to the Re-arrest action.
+- The TV's core CPR monitor, shock workflow and pre-/post-intubation ventilation coach remain unchanged by these optional panels.
+
+**Clinical and technical limitations:** POCUS is for trained personnel, with no additional or prolonged CPR interruptions. Its use and interpretation require clinical context; no ultrasound or laboratory checklist entry is a validated diagnosis. The prototype has no patient identity, no durable history, and no high-availability timing/decision support guarantees. These screens are for simulation and documentation only.
+
+Clinical reference pages:
+- https://www.resus.org.uk/professional-library/2025-resuscitation-guidelines/adult-advanced-life-support-guidelines
+- https://www.resus.org.uk/professional-library/2025-resuscitation-guidelines/special-circumstances-guidelines
