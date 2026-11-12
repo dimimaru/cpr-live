@@ -1,4 +1,4 @@
-// CPR Live v1.4 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.5 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -29,7 +29,7 @@ if(tvMode){
   document.title="CPR Live Monitor";
 }
 const DEVICE_ID = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + "-" + Math.random();
-const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2","charge","clear","adjunct"]);
+const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2","charge","clear","adjunct","finding","procedure"]);
 const TWO_MIN = 120000;
 const FOUR_MIN = 240000;
 const SHOCK_COOLDOWN_MS = 100000; // 1 min 40 seconds for duplicate SHOCK logs
@@ -38,8 +38,34 @@ const ACTION_COOLDOWN_MS = 5000; // per-button anti-double-tap for other actions
 const FIVE_MIN = 300000;
 const EPI_PREWARN_MS = 20000;
 const SHOCKABLE_RHYTHMS = new Set(["VF","VT"]);
-const ADJUNCT_NAMES={nahco3:"7.5% NaHCO₃",calcium:"10% Calcium",glucose:"50% Glucose",lidocaine:"Lidocaine"};
-function actionGroup(type,value){ return type==="adjunct"?"adjunct:"+value:type; }
+const ADJUNCT_NAMES={
+  nahco3:"7.5% NaHCO₃", // legacy events
+  nahco3_1:"7.5% NaHCO₃ · 1 amp",nahco3_2:"7.5% NaHCO₃ · 2 amp",
+  calcium:"10% Calcium",glucose:"50% Glucose",lidocaine:"Lidocaine",
+  prc:"PRC · 1 unit"
+};
+const FINDING_LABELS={
+  "pea:pseudo":"Cardiac motion — possible pseudo-PEA",
+  "pea:true":"No visible cardiac motion — possible true PEA",
+  "us:tamponade":"POCUS: Pericardial effusion / suspected tamponade",
+  "us:hypovolemia":"POCUS: Hypovolemia pattern (context dependent)",
+  "us:ptx_lt":"Lung US: possible pneumothorax Lt",
+  "us:ptx_rt":"Lung US: possible pneumothorax Rt",
+  "us:rv_strain":"POCUS: RV strain (PE not diagnostic by this alone)",
+  "us:free_fluid":"eFAST: free fluid / hemoperitoneum suspected",
+  "lab:gas":"Lab: VBG/ABG — pH, bicarbonate, pCO₂",
+  "lab:k":"Lab: Potassium (K⁺)",
+  "lab:glucose":"Lab: Glucose",
+  "lab:ca":"Lab: Ionized calcium (Ca²⁺)",
+  "lab:mg":"Lab: Magnesium (Mg²⁺)",
+  "lab:hb":"Lab: Hb/Hct",
+  "lab:lactate":"Lab: Lactate",
+  "lab:temp":"Check: Core temperature",
+  "trauma:efast":"Trauma: eFAST performed",
+  "trauma:bleeding":"Trauma: Hemorrhage considered"
+};
+const PROCEDURE_NAMES={icd_lt:"ICD Lt",icd_rt:"ICD Rt"};
+function actionGroup(type,value){ return ["adjunct","finding","procedure"].includes(type)?type+":"+value:type; }
 function actionCooldownRemaining(s,type,now,value){
   // START is gated by standby/ROSC phase, so a rapid re-arrest cannot be
   // blocked by the five-second duplicate tap guard from the previous episode.
@@ -115,6 +141,7 @@ function blankState() {
     clearAt:null,
     adjunctCounts:{},
     peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,coachAnchor:null,
+    findings:{},procedures:{},
     metronomeOn:true,lastActionAt:{},timeline:[]
   };
 }
@@ -160,6 +187,7 @@ function computeState() {
       s.shockFlow=null;
       s.clearAt=null;
       s.peaWidth=null;
+      s.findings={};s.procedures={}; // Re-arrest starts a fresh cause assessment.
       if(s.advancedAirway)s.ventAnchor=t; // Re-arrest: start a new 6-second breath cycle.
       // The epinephrine clock starts only on a documented dose.
       // Before a dose the TV displays "NO NEED".
@@ -287,7 +315,20 @@ function computeState() {
     } else if (e.type==="adjunct" &&
       ["running","paused"].includes(s.phase) && ADJUNCT_NAMES[e.value]){
       s.adjunctCounts[e.value]=(s.adjunctCounts[e.value]||0)+1;
-      line(s,e,"ADJUNCT: "+ADJUNCT_NAMES[e.value]);
+      line(s,e,ADJUNCT_NAMES[e.value]);
+    } else if(e.type==="finding" && ["running","paused"].includes(s.phase) &&
+      ["PEA","Asystole"].includes(s.rhythm) && FINDING_LABELS[e.value]){
+      const wasSelected=!!s.findings[e.value];
+      if(e.value==="pea:pseudo" || e.value==="pea:true"){
+        s.findings["pea:pseudo"]=false;s.findings["pea:true"]=false;
+      }
+      s.findings[e.value]=!wasSelected;
+      line(s,e,(wasSelected?"UNCHECKED: ":"CHECKED: ")+FINDING_LABELS[e.value]);
+    } else if(e.type==="procedure" && ["running","paused"].includes(s.phase) &&
+      ["PEA","Asystole"].includes(s.rhythm) &&
+      PROCEDURE_NAMES[e.value] && !s.procedures[e.value]){
+      s.procedures[e.value]=true;
+      line(s,e,PROCEDURE_NAMES[e.value]);
     } else if (e.type==="metro" && typeof e.value==="boolean") {
       // Sync metronome setting silently: no Timeline entry or spoken feedback.
       s.metronomeOn=e.value;
@@ -382,6 +423,7 @@ function announceEvent(e,s) {
     charge:"ชาร์จ กดหน้าอกต่อ",
     clear:"เคลียร์",
     adjunct:"บันทึก "+ADJUNCT_NAMES[e.value],
+    procedure:"บันทึก "+PROCEDURE_NAMES[e.value],
     start:"เริ่มซีพีอาร์ บันทึกริทึม",
     pause:e.value==="cycle"?"พักซีพีอาร์ ตรวจริทึม":"พักกดหน้าอก",
     reset:"รีเซ็ต",
@@ -480,7 +522,7 @@ function amiodaroneStatus(s){
   const min=amiodaroneMinimumShock(s,dose);
   const available=visible && s.shock>=min;
   const prepare=visible && !available;
-  const recommended=available && s.shock>=(dose===300?min:5);
+  const recommended=available; // Both 300 mg and 150 mg enabled buttons use the highlighted style.
   return {dose,visible,available,prepare,recommended};
 }
 function medicationCue(s,clock){
@@ -960,8 +1002,7 @@ function render() {
   amioButton.textContent=medication==="prepare"?
     "💉 เตรียม AMIODARONE "+amio.dose+" mg":
     "💉 AMIODARONE "+amio.dose+" mg";
-  if(amio.dose===150 && amio.available && !amio.recommended)
-    amioButton.textContent="💉 AMIODARONE 150 mg · บันทึกยาที่ให้จริง";
+  // Both doses share one highlighted style whenever documentation is enabled.
   amioButton.classList.toggle("amio-highlight",amio.recommended);
   amioButton.classList.toggle("amio-prepare",medication==="prepare");
   amioButton.classList.toggle("amio-muted",!amio.recommended && medication!=="prepare");
@@ -1027,6 +1068,8 @@ function validEvent(obj) {
   if (obj.type==="metro" && typeof obj.value!=="boolean")return false;
   if (obj.type==="amio" && obj.value!==300 && obj.value!==150)return false;
   if (obj.type==="adjunct" && !ADJUNCT_NAMES[obj.value])return false;
+  if (obj.type==="finding" && !FINDING_LABELS[obj.value])return false;
+  if (obj.type==="procedure" && !PROCEDURE_NAMES[obj.value])return false;
   if (obj.type==="etco2" && (!Number.isInteger(obj.value)||obj.value<0||obj.value>150)) return false;
   return true;
 }
@@ -1063,6 +1106,11 @@ async function handleAction(type,value) {
   if(type==="charge" && s.shockFlow!=="decision")return;
   if(type==="clear" && !["decision","charging"].includes(s.shockFlow))return;
   if(type==="adjunct" && (!["running","paused"].includes(s.phase) || !ADJUNCT_NAMES[value]))return;
+  if(type==="finding" && (!["running","paused"].includes(s.phase) ||
+      !["PEA","Asystole"].includes(s.rhythm) || !FINDING_LABELS[value]))return;
+  if(type==="procedure" && (!["running","paused"].includes(s.phase) ||
+      !["PEA","Asystole"].includes(s.rhythm) || !PROCEDURE_NAMES[value] ||
+      s.procedures[value]))return;
   if (type==="rosc" && !["running","paused"].includes(s.phase))return;
   if (type==="reset" && s.phase==="standby")return;
   if (["shock","epi","rhythm","peaWidth","etTube"].includes(type) && !["running","paused"].includes(s.phase))return;
@@ -1086,11 +1134,8 @@ async function handleAction(type,value) {
       s.amioDoses.length>=2)return;
     const next=s.amioDoses.length===0?300:150;
     if(s.shock<amiodaroneMinimumShock(s,next))return;
-    // The ERC 2025 guidance places the second dose after five shocks.
-    // After shock four, keep a manual override for documenting a dose
-    // actually administered by the clinician; never imply it is due.
-    if(next===150 && s.shock===4 &&
-      !confirm("ขณะนี้ Shock #4: ERC 2025 ระบุให้พิจารณา Amiodarone 150 mg หลัง Shock #5\nยืนยันว่ากำลังบันทึกยาที่ได้ให้จริง ไม่ใช่การสั่งให้ยาอัตโนมัติ?"))return;
+    // This prototype permits logging a second 150 mg dose at Shock #4
+    // by project-specific choice. The button logs a dose, not a recommendation.
     value=next;
   }
   const e={id:DEVICE_ID+"-"+(++sequence),type,ts:Date.now(),seq:sequence,value};
