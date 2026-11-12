@@ -321,7 +321,7 @@ function announceEvent(e,s) {
   if(!audioReady || !tvMode || e.type==="resume" || e.type==="metro")return;
   const spoken={
     start:"เริ่มซีพีอาร์ บันทึกริทึม",
-    pause:"พักกดหน้าอก",
+    pause:e.value==="cycle"?"พักซีพีอาร์ ตรวจริทึม":"พักกดหน้าอก",
     reset:"รีเซ็ต",
     shock:"ช็อกครั้งที่ "+s.shock+" "+shockAdvice(s),
     epi:"อิพิเนฟริน ครั้งที่ "+s.epi,
@@ -725,7 +725,7 @@ function render() {
     });
   }
   document.getElementById("epiReminderTitle").textContent=
-    "EPINEPHRINE TIMER";
+    s.lastEpiAt===null?"ADRENALINE":"ADRENALINE TIMER";
   document.getElementById("amio300Badge").classList.toggle("administered",s.amioDoses.includes(300));
   document.getElementById("amio150Badge").classList.toggle("administered",s.amioDoses.includes(150));
   document.getElementById("roscChecklist").hidden=s.phase!=="rosc";
