@@ -220,3 +220,26 @@ Guidelines:
 - The 2-minute CPR clock continues independently. The mask coach is not a compression detector; CCF remains a manual Pause/Resume estimate and does not automatically measure or subtract actual mask ventilation interruptions.
 
 Simulation only. A browser cannot guarantee audio timing, reliable event delivery, or a clinically safe medication/defibrillation lock. Never use these UI locks to delay real care.
+
+## V1.0.3 — Two Home Screen apps and updated 30:2 mask timing
+
+Two distinct launch URLs and manifests now exist, each with its own installed app
+identifier, iOS apple-touch-icon and PNG icons (180, 192, 512 px).
+
+- **CPR Remote**: https://dimimaru.github.io/cpr-live/?room=ER-DEMO-01
+  Uses the dark-navy stopwatch/heart/report/algorithm icon and opens the controller.
+- **CPR Monitor**: https://dimimaru.github.io/cpr-live/tv.html?room=ER-DEMO-01
+  Uses the cyan ECG display/CPR monitor icon and opens directly in TV mode.
+- Legacy ?view=tv links continue to display TV mode, but for installing the
+  Monitor icon on iOS, open the dedicated **tv.html** URL instead.
+- PNG icons are built by .github/workflows/pwa-icons.yml from SVG design assets
+  and stored in assets/. They are a vector adaptation of the selected artwork.
+- iPhone/iPad: open each link in Safari, Share → Add to Home Screen, enable
+  Open as Web App. If an older Home Screen icon is cached, delete it and re-add.
+- Before ET-tube the **30:2** coach is explicit on the TV. It has 30 compression
+  beats at 105/min, then **1.5 seconds per mask breath**, with a 0.5-second
+  release between the two breaths, for a 3.5-second ventilation segment.
+- After ET-tube, the independent six-second ventilation coach is retained.
+
+Still simulation only; browser audio and real-time synchronization are not
+guaranteed and no patient information should be stored.
