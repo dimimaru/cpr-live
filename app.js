@@ -52,7 +52,9 @@ const METRONOME_BPM=105;
 const METRONOME_INTERVAL=60/METRONOME_BPM;
 const COMPRESSION_BEAT_MS=60000/METRONOME_BPM;
 const THIRTY_BEATS_MS=30*COMPRESSION_BEAT_MS;
-const TWO_BREATHS_MS=2500; // 1 s breath, 0.5 s release, 1 s breath
+const BREATH_DURATION_MS=1500; // 1.5-second inspiratory visual cue
+const BREATH_RELEASE_MS=500;
+const TWO_BREATHS_MS=2*BREATH_DURATION_MS+BREATH_RELEASE_MS; // 3.5 s total
 const MASK_CYCLE_MS=THIRTY_BEATS_MS+TWO_BREATHS_MS;
 
 document.body.classList.toggle("tv-mode",tvMode);
@@ -298,7 +300,8 @@ function maskCoach(s,now){
     return {round,position,breath:0,count:Math.min(30,Math.floor(position/COMPRESSION_BEAT_MS)+1),squeeze:false};
   }
   const b=position-THIRTY_BEATS_MS;
-  return {round,position,breath:b<1500?1:2,count:30,squeeze:b<1000||b>=1500};
+  return {round,position,breath:b<BREATH_DURATION_MS+BREATH_RELEASE_MS?1:2,
+    count:30,squeeze:b<BREATH_DURATION_MS||b>=BREATH_DURATION_MS+BREATH_RELEASE_MS};
 }
 function epiColor(s,clock){
   if(!["running","paused"].includes(s.phase))return "neutral";
@@ -532,6 +535,7 @@ function renderVentilation(s,clock) {
   if(!show)return;
   const paused=s.phase==="paused";
   document.getElementById("ventMode").textContent=s.advancedAirway?"ET-TUBE":"30:2";
+  document.getElementById("ventRatio").hidden=s.advancedAirway;
   document.getElementById("bagIcon").hidden=!s.advancedAirway;
   document.getElementById("maskIcon").hidden=s.advancedAirway;
   let number,label,mobileLabel,squeeze=false;
@@ -544,7 +548,7 @@ function renderVentilation(s,clock) {
     const coach=maskCoach(s,paused?s.pausedAt:Date.now());
     number=coach.breath?coach.breath+"/2":coach.count+"/30";
     squeeze=!paused&&coach.squeeze;
-    label=coach.breath?(coach.squeeze?"MASK • BREATH "+coach.breath+" / 2":"RELEASE MASK BAG"):"COMPRESSIONS • 30:2";
+    label=coach.breath?(coach.squeeze?"MASK • BREATH "+coach.breath+"/2"+" • 1.5 s":"RELEASE MASK BAG • 0.5 s"):"COMPRESSIONS • 30:2";
     mobileLabel=coach.breath?(coach.squeeze?"BREATH "+coach.breath+"/2":"RELEASE"):"COMPRESSIONS";
   }
   if(paused){label=mobileLabel="CPR PAUSED";}
