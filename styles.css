@@ -751,3 +751,52 @@ body.tv-mode .vent-ratio strong{font-size:clamp(17px,1.7vw,25px);color:#fff;whit
 body.tv-mode .ventilator.mask-coach.squeeze{background:#065e43}
 body.tv-mode .ventilator.mask-coach .vent-time span{font-size:clamp(11px,1.1vw,16px)}
 @media(max-height:680px) and (min-aspect-ratio:1/1){body.tv-mode .vent-ratio{gap:8px;font-size:8px}body.tv-mode .vent-ratio strong{font-size:15px}}
+
+
+/* V1.1 — mobile onboarding: exactly one large START, then four large rhythm choices.
+   The TV's full monitor layout is not modified. */
+body:not(.tv-mode) .remote-onboarding[hidden],
+body:not(.tv-mode) .remote-onboarding-screen[hidden],
+body:not(.tv-mode) .epi-control[hidden],
+body:not(.tv-mode) #amioButton[hidden] {display:none!important}
+body:not(.tv-mode) .remote-onboarding{width:100%}
+body:not(.tv-mode).remote-stage-start .roombar,
+body:not(.tv-mode).remote-stage-rhythm .roombar,
+body:not(.tv-mode).remote-stage-start .monitor,
+body:not(.tv-mode).remote-stage-rhythm .monitor,
+body:not(.tv-mode).remote-stage-start .timeline-section,
+body:not(.tv-mode).remote-stage-rhythm .timeline-section,
+body:not(.tv-mode).remote-stage-start .footer,
+body:not(.tv-mode).remote-stage-rhythm .footer,
+body:not(.tv-mode).remote-stage-start .controller>:not(#onboardingStage),
+body:not(.tv-mode).remote-stage-rhythm .controller>:not(#onboardingStage){display:none!important}
+body:not(.tv-mode).remote-stage-start .controller,
+body:not(.tv-mode).remote-stage-rhythm .controller{
+  display:flex;align-items:center;justify-content:center;
+  min-height:calc(100dvh - 130px);margin-top:8px;
+  border:0;background:transparent;box-shadow:none;
+  padding:clamp(12px,5vw,30px);
+}
+.remote-onboarding-screen{width:100%;max-width:740px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:20px}
+.remote-stage-start-button{
+  width:100%;max-width:660px;min-height:clamp(160px,40vh,325px);
+  font-size:clamp(29px,8vw,53px);font-weight:900;letter-spacing:-.025em;
+  background:linear-gradient(135deg,#168960,#075c48)!important;
+  border:2px solid #43ddab!important;border-radius:25px!important;
+  box-shadow:0 12px 35px rgba(0,0,0,.26);
+}
+.remote-stage-room,.remote-stage-clock{color:#a9bcd1;font-size:12px;letter-spacing:.08em;font-weight:800}
+.remote-stage-heading{font-size:clamp(23px,5.5vw,36px);font-weight:900;letter-spacing:.08em;color:#d7ecff}
+.remote-stage-rhythm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(12px,2.8vw,22px);width:100%}
+.remote-stage-rhythm-grid>.stage-rhythm-button{
+  min-height:clamp(145px,22vh,250px);
+  font-size:clamp(24px,5.5vw,44px);font-weight:900;
+  border-radius:21px;background:#194568;border:2px solid #45759d;
+}
+.remote-stage-rhythm-grid>.stage-rhythm-button:nth-child(-n+2){background:#843045;border-color:#d7687f}
+body:not(.tv-mode).remote-stage-normal .remote-onboarding{display:none!important}
+body:not(.tv-mode) .remote-main #startButton{font-size:clamp(17px,3.8vw,24px)}
+@media(max-width:450px){
+  .remote-stage-rhythm-grid{gap:10px}
+  .remote-stage-rhythm-grid>.stage-rhythm-button{min-height:clamp(130px,23vh,210px)}
+}
