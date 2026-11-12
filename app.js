@@ -1,4 +1,4 @@
-// CPR Live v1.2 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.3 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -29,7 +29,7 @@ if(tvMode){
   document.title="CPR Live Monitor";
 }
 const DEVICE_ID = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + "-" + Math.random();
-const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2"]);
+const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2","charge","clear","adjunct"]);
 const TWO_MIN = 120000;
 const FOUR_MIN = 240000;
 const SHOCK_COOLDOWN_MS = 100000; // 1 min 40 seconds for duplicate SHOCK logs
@@ -38,11 +38,12 @@ const ACTION_COOLDOWN_MS = 5000; // per-button anti-double-tap for other actions
 const FIVE_MIN = 300000;
 const EPI_PREWARN_MS = 20000;
 const SHOCKABLE_RHYTHMS = new Set(["VF","VT"]);
-function actionGroup(type){ return type; }
-function actionCooldownRemaining(s,type,now){
+const ADJUNCT_NAMES={nahco3:"7.5% NaHCO₃",calcium:"10% Calcium",glucose:"50% Glucose",lidocaine:"Lidocaine"};
+function actionGroup(type,value){ return type==="adjunct"?"adjunct:"+value:type; }
+function actionCooldownRemaining(s,type,now,value){
   if(type==="shock")return s.lastShockAt===null?0:Math.max(0,s.lastShockAt+SHOCK_COOLDOWN_MS-now);
   if(type==="epi")return s.lastEpiAt===null?0:Math.max(0,s.lastEpiAt+EPI_COOLDOWN_MS-now);
-  const last=s.lastActionAt[actionGroup(type)];
+  const last=s.lastActionAt[actionGroup(type,value)];
   return last===undefined?0:Math.max(0,last+ACTION_COOLDOWN_MS-now);
 }
 const fmt = n => String(n).padStart(2,"0");
@@ -104,6 +105,9 @@ function blankState() {
     shock:0,lastShockAt:null,lastEpiAt:null,epi:0,amioDoses:[],
     rhythm:"—",lastRhythmEventId:null,lastShockRhythmEventId:null,
     fromNonShockable:false,
+    shockFlow:null, // decision / charging / readyShock / postShock
+    clearAt:null,
+    adjunctCounts:{},
     peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,coachAnchor:null,
     metronomeOn:true,lastActionAt:{},timeline:[]
   };
@@ -115,7 +119,7 @@ function chronological() {
 function line(state,e,label) {
   state.timeline.push({id:e.id,ts:e.ts,label});
   if(e.type!=="shock" && e.type!=="epi" && e.type!=="reset"){
-    state.lastActionAt[actionGroup(e.type)]=e.ts;
+    state.lastActionAt[actionGroup(e.type,e.value)]=e.ts;
   }
 }
 function computeState() {
@@ -123,7 +127,7 @@ function computeState() {
   for (const e of chronological()) {
     const t = e.ts;
     if(e.type!=="shock" && e.type!=="epi" && e.type!=="reset" &&
-      actionCooldownRemaining(s,e.type,t)>0)continue;
+      actionCooldownRemaining(s,e.type,t,e.value)>0)continue;
     if (e.type === "reset") {
       Object.assign(s,blankState());
     } else if (e.type === "start" && (s.phase === "standby" || s.phase === "rosc")) {
@@ -147,6 +151,8 @@ function computeState() {
       s.lastRhythmEventId=null;
       s.lastShockRhythmEventId=null;
       s.fromNonShockable=false; // Re-arrest begins a new rhythm pathway.
+      s.shockFlow=null;
+      s.clearAt=null;
       s.peaWidth=null;
       if(s.advancedAirway)s.ventAnchor=t; // Re-arrest: start a new 6-second breath cycle.
       // The epinephrine clock starts only on a documented dose.
@@ -160,12 +166,41 @@ function computeState() {
       s.pauseRhythmRecorded=false;
       s.phase="paused";
       line(s,e,s.pauseReason==="cycle"?"2-MIN CYCLE — PAUSE FOR RHYTHM":"PAUSE CHEST COMPRESSIONS");
+    } else if (e.type === "charge" &&
+      s.shockFlow==="decision" && ["running","paused"].includes(s.phase)) {
+      // Compression continues during charging. Close any earlier rhythm-check pause.
+      if(s.phase==="paused" && s.pausedAt!==null){
+        s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
+        s.pausedAt=null;
+        s.pauseId=null;
+        s.pauseReason=null;
+        s.pauseRhythmRecorded=false;
+        s.coachAnchor=t;
+      }
+      s.phase="running";
+      s.shockFlow="charging";
+      line(s,e,"RESUME CPR — DEFIB CHARGING");
+    } else if (e.type === "clear" &&
+      ["decision","charging"].includes(s.shockFlow) &&
+      ["running","paused"].includes(s.phase)) {
+      if(s.phase==="running"){
+        s.phase="paused";
+        s.pausedAt=t;
+        s.pauseId=e.id;
+      }
+      // Direct CLEAR leaves an existing rhythm-check pause intact for CCF.
+      s.pauseReason="shock";
+      s.pauseRhythmRecorded=true;
+      s.clearAt=t; // Peri-shock countdown starts at CLEAR.
+      s.shockFlow="readyShock";
+      line(s,e,"CLEAR — CHARGE READY / HANDS OFF");
     } else if (e.type === "resume" && s.phase === "paused") {
-      const interruption=Math.max(0,t-s.pausedAt);
+      if(s.shockFlow && s.shockFlow!=="postShock")continue;
       if(s.pauseReason==="cycle" && !s.pauseRhythmRecorded)continue;
+      const interruption=Math.max(0,t-s.pausedAt);
       s.pauseAccruedMs+=interruption;
-      if(s.pauseReason==="cycle"){
-        s.cycleAnchor=t; // New 2-minute period begins after the cycle's rhythm check.
+      if(s.pauseReason==="cycle" || s.shockFlow==="postShock"){
+        s.cycleAnchor=t; // Next two-minute cycle begins only after Resume.
       }
       s.pausedAt=null;
       s.pauseId=null;
@@ -173,6 +208,8 @@ function computeState() {
       s.pauseRhythmRecorded=false;
       s.phase="running";
       s.coachAnchor=t;
+      s.shockFlow=null;
+      s.clearAt=null;
       line(s,e,"RESUME COMPRESSIONS — interruption "+timeText(interruption));
     } else if (e.type === "rosc" && ["running","paused"].includes(s.phase)) {
       if (s.pausedAt!==null) s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
@@ -183,22 +220,27 @@ function computeState() {
       s.pauseId=null;
       s.pauseReason=null;
       s.pauseRhythmRecorded=false;
+      s.shockFlow=null;
+      s.clearAt=null;
       s.phase="rosc";
       line(s,e,"ROSC — CPR STOPPED");
     } else if (["running","paused"].includes(s.phase) && e.type === "shock") {
       // Shared event-source guard: only the earliest shock in each 100s window
       // is counted, even if several controllers broadcast duplicate clicks.
       // This is UI/logging protection, not an electrical defibrillator lockout.
-      if((s.lastShockAt===null || t-s.lastShockAt>=SHOCK_COOLDOWN_MS) &&
+      if(s.shockFlow==="readyShock" && s.phase==="paused" &&
+        (s.lastShockAt===null || t-s.lastShockAt>=SHOCK_COOLDOWN_MS) &&
         SHOCKABLE_RHYTHMS.has(s.rhythm) && s.lastRhythmEventId!==null &&
         s.lastRhythmEventId!==s.lastShockRhythmEventId){
         s.shock++;
         s.lastShockAt=t;
         s.lastShockRhythmEventId=s.lastRhythmEventId;
+        s.shockFlow="postShock";
         line(s,e,"SHOCK #"+s.shock);
       }
     } else if (["running","paused"].includes(s.phase) && e.type === "epi") {
-      if(s.lastEpiAt===null || t-s.lastEpiAt>=EPI_COOLDOWN_MS){
+      if((s.fromNonShockable || (SHOCKABLE_RHYTHMS.has(s.rhythm) && s.shock>=2)) &&
+         (s.lastEpiAt===null || t-s.lastEpiAt>=EPI_COOLDOWN_MS)){
         s.epi++;
         s.epiAnchor=t;
         s.lastEpiAt=t;
@@ -219,6 +261,13 @@ function computeState() {
       if(e.value==="PEA" || e.value==="Asystole")s.fromNonShockable=true;
       s.lastRhythmEventId=e.id;
       if(s.phase==="paused" && s.pauseReason==="cycle")s.pauseRhythmRecorded=true;
+      if(SHOCKABLE_RHYTHMS.has(e.value)){
+        // A new rhythm is required to initiate a fresh Shock workflow.
+        if(s.shockFlow===null)s.shockFlow="decision";
+      }else{
+        s.shockFlow=null;
+        s.clearAt=null;
+      }
       s.peaWidth=null;
       line(s,e,"RHYTHM: "+(s.rhythm==="VT"?"pVT":s.rhythm));
     } else if (["running","paused"].includes(s.phase) && e.type === "peaWidth" &&
@@ -229,6 +278,10 @@ function computeState() {
       s.advancedAirway=true;
       s.ventAnchor=t;
       line(s,e,"ET-TUBE (reported placed) — ventilation coach started");
+    } else if (e.type==="adjunct" &&
+      ["running","paused"].includes(s.phase) && ADJUNCT_NAMES[e.value]){
+      s.adjunctCounts[e.value]=(s.adjunctCounts[e.value]||0)+1;
+      line(s,e,"ADJUNCT: "+ADJUNCT_NAMES[e.value]);
     } else if (e.type==="metro" && typeof e.value==="boolean") {
       // Sync metronome setting silently: no Timeline entry or spoken feedback.
       s.metronomeOn=e.value;
@@ -320,6 +373,9 @@ function shockAdvice(s) {
 function announceEvent(e,s) {
   if(!audioReady || !tvMode || e.type==="resume" || e.type==="metro")return;
   const spoken={
+    charge:"ชาร์จ กดหน้าอกต่อ",
+    clear:"เคลียร์",
+    adjunct:"บันทึก "+ADJUNCT_NAMES[e.value],
     start:"เริ่มซีพีอาร์ บันทึกริทึม",
     pause:e.value==="cycle"?"พักซีพีอาร์ ตรวจริทึม":"พักกดหน้าอก",
     reset:"รีเซ็ต",
@@ -906,6 +962,7 @@ function validEvent(obj) {
   if (obj.type==="peaWidth" && !["Narrow","Wide"].includes(obj.value))return false;
   if (obj.type==="metro" && typeof obj.value!=="boolean")return false;
   if (obj.type==="amio" && obj.value!==300 && obj.value!==150)return false;
+  if (obj.type==="adjunct" && !ADJUNCT_NAMES[obj.value])return false;
   if (obj.type==="etco2" && (!Number.isInteger(obj.value)||obj.value<0||obj.value>150)) return false;
   return true;
 }
