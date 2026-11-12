@@ -1,0 +1,26 @@
+{
+  "name": "CPR Live Monitor",
+  "short_name": "CPR Monitor",
+  "id": "./app/monitor",
+  "start_url": "./tv.html?room=ER-DEMO-01",
+  "scope": "./",
+  "display": "fullscreen",
+  "background_color": "#031634",
+  "theme_color": "#031634",
+  "orientation": "landscape",
+  "description": "CPR synchronized TV monitor — simulation only",
+  "icons": [
+    {
+      "src": "./assets/cpr-monitor-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/cpr-monitor-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
