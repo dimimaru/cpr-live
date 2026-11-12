@@ -1,4 +1,4 @@
-// CPR Live v1.0.2 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.0.3 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
