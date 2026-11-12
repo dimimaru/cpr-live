@@ -6,6 +6,19 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle
 const cfg = window.CPR_CONFIG || {};
 const params = new URLSearchParams(location.search);
 const tvMode = params.get("view") === "tv" || window.CPR_FORCE_TV_MODE === true;
+// Canonicalize ALL TV links to a dedicated TV document. This prevents the
+// browser share sheet or Home Screen launch from copying the Remote URL.
+if(tvMode){
+  const canonical=new URL("tv.html",new URL("./",location.href));
+  canonical.searchParams.set("room",params.get("room")||"ER-DEMO-01");
+  canonical.searchParams.set("view","tv");
+  const actual=new URL(location.href);
+  if(actual.pathname!==canonical.pathname ||
+     actual.searchParams.get("view")!=="tv" ||
+     actual.searchParams.get("room")!==canonical.searchParams.get("room")){
+    history.replaceState({}, "", canonical.toString());
+  }
+}
 // Legacy ?view=tv still displays the monitor; dedicated tv.html has a stable
 // manifest, app ID and Apple touch icon for Home Screen installation.
 if(tvMode){
@@ -895,6 +908,8 @@ function makeLink(view) {
   const base=new URL("./",location.href);
   const url=new URL(view==="tv"?"tv.html":"",base);
   url.searchParams.set("room",room);
+  // Redundant mode flag makes it safe with browsers that cache earlier HTML.
+  if(view==="tv")url.searchParams.set("view","tv");
   return url.toString();
 }
 async function copyLink(view) {
@@ -905,6 +920,19 @@ async function copyLink(view) {
   } catch {
     prompt("คัดลอกลิงก์นี้",url);
   }
+}
+async function shareTvLink(){
+  const url=makeLink("tv");
+  if(typeof navigator.share==="function"){
+    try {
+      await navigator.share({title:"CPR Live TV Display",text:"CPR Live — TV Display",url});
+      return;
+    }catch(e){
+      if(e && e.name==="AbortError")return;
+      // Share is unavailable in this browser context; fall back to copy.
+    }
+  }
+  await copyLink("tv");
 }
 // Expand the TV dashboard within its page automatically. True browser fullscreen
 // normally requires a direct local user interaction (browser security restriction).
@@ -1124,7 +1152,7 @@ document.getElementById("joinRoomBtn").addEventListener("click",()=>enterRoom(do
 document.getElementById("roomInput").addEventListener("keydown",e=>{
   if (e.key==="Enter")enterRoom(e.currentTarget.value);
 });
-document.getElementById("copyTvLink").addEventListener("click",()=>copyLink("tv"));
+document.getElementById("copyTvLink").addEventListener("click",shareTvLink);
 document.getElementById("copyControlLink").addEventListener("click",()=>copyLink("controller"));
 document.querySelectorAll("[data-action]").forEach(btn=>
   btn.addEventListener("click",()=>{
