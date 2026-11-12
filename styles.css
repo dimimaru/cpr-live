@@ -909,3 +909,90 @@ body:not(.tv-mode) .co2-attach-overlay{display:none!important}
 .co2-state-message[hidden],.co2-value[hidden],
 body.tv-mode .rhythm-pause-banner[hidden],
 body.tv-mode .co2-attach-overlay[hidden]{display:none!important}
+
+
+/* V1.3 — shockable-route cards and compact remote; TV layout stays unchanged */
+body:not(.tv-mode):is(.remote-stage-decision,.remote-stage-charging,.remote-stage-shock) :is(.roombar,.monitor,.timeline-section,.footer){display:none!important}
+body:not(.tv-mode):is(.remote-stage-decision,.remote-stage-charging,.remote-stage-shock) .controller>:not(#onboardingStage){display:none!important}
+body:not(.tv-mode):is(.remote-stage-decision,.remote-stage-charging,.remote-stage-shock) .controller{
+  display:flex;align-items:center;justify-content:center;
+  min-height:calc(100dvh - 130px);margin-top:8px;
+  border:0;background:transparent;box-shadow:none;
+  padding:clamp(12px,5vw,30px);
+}
+body:not(.tv-mode) .remote-stage-guidance{
+  margin:0;text-align:center;color:#a9c0d5;font-weight:750;
+  font-size:clamp(12px,3vw,17px);line-height:1.4;
+}
+body:not(.tv-mode) .remote-flow-charge,
+body:not(.tv-mode) .remote-flow-clear,
+body:not(.tv-mode) .remote-stage-shock-button{
+  width:100%;max-width:670px;border-radius:24px;
+  min-height:clamp(130px,25vh,220px);
+  font-size:clamp(27px,6.6vw,46px);font-weight:900;
+  display:flex;flex-direction:column;gap:8px;
+  justify-content:center;align-items:center;
+  white-space:normal;text-align:center;
+}
+body:not(.tv-mode) .remote-flow-charge{
+  border:3px solid #4be7b2;background:#086d50;
+  color:#fff;
+}
+body:not(.tv-mode) .remote-flow-clear{
+  border:3px solid #ffcd67;background:#aa5c15;
+  color:#fff;
+}
+body:not(.tv-mode) .remote-flow-charge small,
+body:not(.tv-mode) .remote-flow-clear small{
+  font-size:clamp(13px,3vw,22px);font-weight:800;line-height:1.2;
+}
+body:not(.tv-mode) .remote-stage-shock-button{
+  background:#b71f41;border:4px solid #fc7190;color:#fff;
+  min-height:clamp(170px,29vh,250px);
+}
+body:not(.tv-mode) .remote-stage-shock-button.critical{
+  animation:critical-resume-pulse 700ms ease-in-out infinite;
+}
+body:not(.tv-mode) .remote-stage-shock-button.cooldown-locked{
+  background:#28394d;border:2px solid #536980;
+}
+body:not(.tv-mode).remote-stage-shock #stageShockScreen>.shock-control{
+  width:100%;max-width:660px;
+}
+body:not(.tv-mode) .remote-main #startButton.rosc{
+  min-height:46px;max-width:140px;padding:9px 12px;
+  justify-self:start;font-size:13px;font-weight:850;
+  border-radius:9px;
+}
+body:not(.tv-mode) #controllerVent{display:none!important}
+body:not(.tv-mode) .remote-main .epi-control{
+  grid-column:auto;min-width:0;
+}
+body:not(.tv-mode) .remote-main #amioButton{
+  width:100%;min-height:71px;
+}
+body:not(.tv-mode) .adjunct-section{
+  margin-top:14px;padding-top:12px;
+  border-top:1px solid #3f5973;
+}
+body:not(.tv-mode) .adjunct-heading{
+  font-size:11px;color:#9fc3df;font-weight:900;
+  letter-spacing:.09em;margin-bottom:8px;
+}
+body:not(.tv-mode) .adjunct-buttons{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;
+}
+body:not(.tv-mode) .adjunct-buttons button{
+  min-width:0;min-height:40px;padding:7px 5px;
+  border-radius:8px;background:#213850;border:1px solid #50647c;
+  color:#dbeafd;font-size:clamp(10px,2.1vw,13px);font-weight:800;
+}
+body:not(.tv-mode) .adjunct-buttons button:disabled{
+  opacity:.38;
+}
+@media(max-width:520px){
+  body:not(.tv-mode) .adjunct-buttons{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(prefers-reduced-motion:reduce){
+  body:not(.tv-mode) .remote-stage-shock-button.critical{animation:none}
+}
