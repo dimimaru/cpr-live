@@ -19,7 +19,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.2</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.3</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -145,10 +145,39 @@
             </div>
             <span class="remote-stage-clock" id="stageRhythmClock">CPR TIMER IS RUNNING</span>
           </div>
+          <div id="stageShockDecisionScreen" class="remote-onboarding-screen" hidden>
+            <div class="remote-stage-heading">SHOCKABLE RHYTHM</div>
+            <p class="remote-stage-guidance">Keep chest compressions going while charging when possible</p>
+            <button type="button" data-action="charge" class="action remote-flow-charge">
+              ▶ RESUME CPR <small>(CHARGING)</small>
+            </button>
+            <button type="button" data-action="clear" class="action remote-flow-clear">
+              ✋ CLEAR <small>(CHARGE READY)</small>
+            </button>
+          </div>
+          <div id="stageChargingScreen" class="remote-onboarding-screen" hidden>
+            <div class="remote-stage-heading">DEFIB CHARGING</div>
+            <p class="remote-stage-guidance">COMPRESSIONS CONTINUE</p>
+            <button type="button" data-action="clear" class="action remote-flow-clear">
+              ✋ CLEAR <small>(CHARGE READY)</small>
+            </button>
+          </div>
+          <div id="stageShockScreen" class="remote-onboarding-screen" hidden>
+            <div class="remote-stage-heading">CLEAR — READY TO SHOCK</div>
+            <div class="remote-resume-timer">
+              <span>PAUSE SINCE CLEAR · 3-SECOND TARGET</span>
+              <strong id="stageShockCountdown">3.0 s</strong>
+              <span id="stageShockElapsed">HANDS-OFF 0.0 s</span>
+            </div>
+            <div class="shock-control">
+              <button id="shockButton" type="button" data-action="shock" class="action shock remote-stage-shock-button">⚡ SHOCK</button>
+              <span id="shockCooldownHint" class="shock-cooldown-hint" hidden></span>
+            </div>
+          </div>
           <div id="stageResumeScreen" class="remote-onboarding-screen" hidden>
             <div class="remote-stage-heading">RHYTHM RECORDED</div>
             <div class="remote-resume-timer">
-              <span>RHYTHM CHECK · 3-SECOND TARGET</span>
+              <span id="stageResumeTimerTitle">RHYTHM CHECK · 3-SECOND TARGET</span>
               <strong id="stageResumeCountdown">3.0 s</strong>
               <span id="stageResumeElapsed">HANDS-OFF 0.0 s</span>
             </div>
@@ -158,12 +187,6 @@
         <div class="section-title"><h2>CPR REMOTE</h2><span>กดจากมือถือ • ส่งผลไปทีวีทันที</span></div>
         <div class="quick-status"><strong data-bind="phase">STANDBY</strong><span>CPR <b data-bind="cycle">02:00</b></span><span>ยา <b data-bind="epiTime">00:00</b></span><span>CO₂ <b data-bind="etco2">—</b></span><span>SHOCK <b data-bind="shock">0</b></span><span class="quick-rhythm" data-bind="rhythm">—</span></div>
         <div id="rhythmWarning" class="rhythm-warning" hidden>⚠️ เริ่ม CPR แล้ว — กรุณาบันทึก Rhythm (เวลาเดินต่อได้)</div>
-        <div class="rhythm-selector">
-          <button data-action="rhythm" data-value="VF" class="action rhythm-button">⚡ VF</button>
-          <button data-action="rhythm" data-value="VT" class="action rhythm-button">⚡ pVT</button>
-          <button data-action="rhythm" data-value="PEA" class="action rhythm-button">PEA</button>
-          <button data-action="rhythm" data-value="Asystole" class="action rhythm-button">ASYSTOLE</button>
-        </div>
         <div id="peaWidthPicker" class="pea-width-picker" hidden>
           <strong>PEA QRS COMPLEX — เลือกความกว้าง</strong>
           <div class="pea-width-buttons">
@@ -186,9 +209,11 @@
         </div>
         <div class="button-grid remote-main">
           <button data-action="start" class="action start" id="startButton">▶ START CPR</button>
-          <div class="shock-control"><button id="shockButton" data-action="shock" class="action shock">⚡ SHOCK</button><span id="shockCooldownHint" class="shock-cooldown-hint" hidden></span></div>
-          <div class="epi-control" id="epiControl"><button data-action="epi" class="action medication epi-muted" id="epiButton">❤️ EPINEPHRINE</button><span id="epiLockHint" class="drug-lock-hint" hidden>LOCKED</span></div>
-          <button data-action="amio" class="action medication amio-muted" id="amioButton">💉 AMIODARONE 300 mg</button>
+          <div class="epi-control" id="epiControl" hidden>
+            <button data-action="epi" class="action medication epi-muted" id="epiButton">❤️ EPINEPHRINE</button>
+            <button data-action="amio" class="action medication amio-muted" id="amioButton" hidden>💉 AMIODARONE 300 mg</button>
+            <span id="epiLockHint" class="drug-lock-hint" hidden></span>
+          </div>
           <div id="airwayAction" class="airway-action">
             <button id="etTubeBtn" data-action="etTube" class="action airway">🫁 ET-TUBE</button>
             <form id="etco2Form" class="etco2-form" hidden>
@@ -204,6 +229,15 @@
           <button id="pauseResumeBtn" class="small-control" data-action="pause">Ⅱ PAUSE CPR</button>
           <button id="resetBtn" class="small-control danger-control" data-action="reset">↺ RESET</button>
           <button id="toggleMetronome" class="small-control metronome-button active" data-action="metro" aria-pressed="true">🎵 105 BPM ON</button>
+        </div>
+        <div class="adjunct-section">
+          <div class="adjunct-heading">ADJUNCT • RECORD ONLY</div>
+          <div class="adjunct-buttons">
+            <button type="button" data-action="adjunct" data-value="nahco3">7.5% NaHCO₃</button>
+            <button type="button" data-action="adjunct" data-value="calcium">10% Calcium</button>
+            <button type="button" data-action="adjunct" data-value="glucose">50% Glucose</button>
+            <button type="button" data-action="adjunct" data-value="lidocaine">Lidocaine</button>
+          </div>
         </div>
         <div class="controller-vent" id="controllerVent" hidden><span id="ventMode">30:2</span> <strong data-bind="ventTime">6</strong><span id="controllerVentLabel">NEXT BREATH</span></div>
         <div id="pauseInfo" class="pause-info" hidden>
@@ -232,7 +266,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.2 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.3 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
