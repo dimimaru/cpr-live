@@ -162,10 +162,10 @@ function computeState() {
       line(s,e,s.pauseReason==="cycle"?"2-MIN CYCLE — PAUSE FOR RHYTHM":"PAUSE CHEST COMPRESSIONS");
     } else if (e.type === "resume" && s.phase === "paused") {
       const interruption=Math.max(0,t-s.pausedAt);
+      if(s.pauseReason==="cycle" && !s.pauseRhythmRecorded)continue;
       s.pauseAccruedMs+=interruption;
       if(s.pauseReason==="cycle"){
-        if(!s.pauseRhythmRecorded)continue; // Require rhythm selection before resuming this cycle.
-        s.cycleAnchor=t; // Next 2-minute cycle begins after Resume.
+        s.cycleAnchor=t; // New 2-minute period begins after the cycle's rhythm check.
       }
       s.pausedAt=null;
       s.pauseId=null;
@@ -578,6 +578,19 @@ function renderInterruption(s,clock){
     const text=mobile.querySelector("span:last-child");
     if(text)text.textContent=remaining===0?"OVER 10s — CONTINUE CPR":"s left before warning";
   }
+  const pauseBanner=document.getElementById("rhythmPauseBanner");
+  pauseBanner.hidden=!(tvMode&&paused);
+  if(tvMode&&paused){
+    const cyclePause=s.pauseReason==="cycle";
+    document.getElementById("tvRhythmPauseMessage").textContent=
+      cyclePause && s.pauseRhythmRecorded?"RHYTHM IDENTIFIED — RESUME CPR":
+      "PAUSE CPR — IDENTIFY RHYTHM";
+    document.getElementById("tvRhythmPauseElapsed").textContent=
+      (clock.currentPauseMs/1000).toFixed(1)+" s HANDS-OFF";
+    pauseBanner.classList.toggle("critical",clock.currentPauseMs>=3000);
+  }else{
+    pauseBanner.classList.remove("critical");
+  }
   const overlay=document.getElementById("pauseAlarmOverlay");
   const over=tvMode&&connected&&paused&&clock.currentPauseMs>=10000;
   overlay.classList.toggle("active",over);
@@ -616,6 +629,24 @@ function renderVentilation(s,clock) {
   tv.classList.toggle("mask-coach",!s.advancedAirway);
   document.getElementById("ventLabel").textContent=label;
   document.getElementById("controllerVentLabel").textContent=mobileLabel;
+}
+function renderEtco2Prompt(s) {
+  const card=document.getElementById("co2Stat");
+  const heading=document.getElementById("co2Heading");
+  const prompt=document.getElementById("co2StateMessage");
+  const normalValue=document.getElementById("co2Value");
+  const overlay=document.getElementById("co2AttachOverlay");
+  const waiting=s.advancedAirway && s.etco2===null &&
+    ["running","paused"].includes(s.phase);
+  const noTube=!s.advancedAirway;
+  card.classList.toggle("ambu-coach",noTube);
+  card.classList.toggle("co2-awaiting",waiting);
+  heading.textContent=noTube?"AMBU 30:2":waiting?"EtCO₂ MONITOR":"EtCO₂";
+  prompt.hidden=!(noTube||waiting);
+  normalValue.hidden=noTube||waiting;
+  if(noTube)prompt.textContent="30 COMPRESSIONS · 2 BREATHS";
+  else if(waiting)prompt.textContent="ATTACH CO₂ MONITOR";
+  overlay.hidden=!(tvMode&&waiting);
 }
 function renderAirwayAndRhythm(s) {
   const active=["running","paused"].includes(s.phase);
@@ -681,7 +712,7 @@ function render() {
     cycle:timeText(currentCycle),
     elapsed:timeText(clock.totalMs),
     epiTime:s.lastEpiAt===null?"NO NEED":timeText(clock.epiMs),
-    epiReminder:s.lastEpiAt===null?"WAIT FOR FIRST RECORDED DOSE":
+    epiReminder:s.lastEpiAt===null?"FIRST DOSE NOT RECORDED":
       s.phase==="rosc"?"ROSC • ไม่แจ้งเตือนยา":
       s.lastEpiAt===null?"รอบันทึกยาครั้งแรก":clock.epiMs>=280000?"EPINEPHRINE DUE SOON / DUE":clock.epiMs>=240000?"4 MIN • READY":"SINCE LAST DOSE",
     shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm==="VT"?"pVT":s.rhythm,etco2:s.etco2===null?"—":s.etco2,
@@ -845,6 +876,7 @@ function render() {
   renderAirwayAndRhythm(s);
   renderVentilation(s,clock);
   renderECG(s);
+  renderEtco2Prompt(s);
   renderInterruption(s,clock);
   checkAlarms(s,clock);
   // Only the active Controller initiates an automatic log entry at the end of
