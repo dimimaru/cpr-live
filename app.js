@@ -744,8 +744,14 @@ function nextMedication(s,clock){
   if(amio.prepare)return "prepare";
   return "none";
 }
+function roscSelectionAvailable(s){
+  return ["running","paused"].includes(s.phase) && !s.shockFlow &&
+    (s.rhythm==="—" ||
+      (s.phase==="paused" && s.pauseReason==="cycle" && !s.pauseRhythmRecorded));
+}
 function renderControllerStage(s) {
   if(tvMode)return;
+  if(roscReviewOpen && !roscSelectionAvailable(s))roscReviewOpen=false;
   const cyclePaused=s.phase==="paused" && s.pauseReason==="cycle";
   const choosing=["running","paused"].includes(s.phase) && s.rhythm==="—";
   const flow=s.shockFlow;
@@ -1413,7 +1419,7 @@ document.getElementById("copyControlLink").addEventListener("click",()=>copyLink
 if(!tvMode){
   document.getElementById("stageRoscPromptBtn").addEventListener("click",()=>{
     const s=computeState();
-    if(!connected || !["running","paused"].includes(s.phase))return;
+    if(!connected || !roscSelectionAvailable(s))return;
     roscReviewOpen=true;
     render();
   });
@@ -1423,7 +1429,7 @@ if(!tvMode){
   });
   document.getElementById("stageRoscConfirmBtn").addEventListener("click",()=>{
     const s=computeState();
-    if(!roscReviewOpen || !connected || !["running","paused"].includes(s.phase))return;
+    if(!roscReviewOpen || !connected || !roscSelectionAvailable(s))return;
     void handleAction("rosc");
   });
 }
