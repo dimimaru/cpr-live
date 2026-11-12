@@ -2,7 +2,7 @@
   "name": "CPR Live Monitor",
   "short_name": "CPR Monitor",
   "id": "./app/monitor",
-  "start_url": "./tv.html?room=ER-DEMO-01",
+  "start_url": "./tv.html?view=tv&room=ER-DEMO-01",
   "scope": "./",
   "display": "fullscreen",
   "background_color": "#031634",
