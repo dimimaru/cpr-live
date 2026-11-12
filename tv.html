@@ -19,7 +19,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.1</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.2</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -87,11 +87,20 @@
             </div>
             <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
             <div class="stat etco2-stat" id="co2Stat">
-              <span>EtCO₂</span>
-              <div class="co2-value"><strong data-bind="etco2">—</strong><small>mmHg</small></div>
+              <span id="co2Heading">AMBU 30:2</span>
+              <div class="co2-state-message" id="co2StateMessage">30 COMPRESSIONS · 2 BREATHS</div>
+              <div class="co2-value" id="co2Value" hidden><strong data-bind="etco2">—</strong><small>mmHg</small></div>
               <div class="co2-warning" id="co2Warning" hidden>⚠️ CO₂ &lt; 10 — CHECK HIGH-QUALITY CPR</div>
             </div>
           </div>
+        </div>
+        <div id="rhythmPauseBanner" class="rhythm-pause-banner" hidden>
+          <strong id="tvRhythmPauseMessage">PAUSE CPR — IDENTIFY RHYTHM</strong>
+          <span id="tvRhythmPauseElapsed">0.0 s HANDS-OFF</span>
+        </div>
+        <div id="co2AttachOverlay" class="co2-attach-overlay" hidden>
+          <strong>ATTACH CO₂ MONITOR</strong>
+          <span>RECORD INITIAL EtCO₂ TO CLEAR THIS ALERT</span>
         </div>
         <div class="ventilator" id="ventilator" hidden>
           <div class="vent-ratio" id="ventRatio"><span>CPR COACH</span><strong>30 : 2</strong><span>MASK VENTILATION</span></div>
@@ -198,7 +207,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.1 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.2 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
