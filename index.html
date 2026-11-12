@@ -19,7 +19,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.4</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.5</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -159,7 +159,43 @@
             <button id="stageRoscBackBtn" type="button" class="stage-rosc-back">กลับไปเลือก Rhythm</button>
           </div>
           <div id="stageReArrestScreen" class="remote-onboarding-screen" hidden>
-            <button id="stageReArrestBtn" type="button" data-action="start" class="action remote-stage-start-button">▶ RE-ARREST · START CPR</button>
+            <div class="remote-stage-heading">ROSC · EPISODE SUMMARY</div>
+            <div class="rosc-summary-actions">
+              <button id="stageReArrestBtn" type="button" data-action="start" class="action remote-rearrest-small">▶ RE-ARREST · START CPR</button>
+              <button id="stageRoscPdfBtn" type="button" class="action post-rosc-pdf"><span>📄</span> REPORT PDF</button>
+              <button id="stageDashboardBtn" type="button" class="action post-rosc-dashboard"><span>📊</span> DASHBOARD</button>
+            </div>
+            <p class="remote-stage-guidance">รายงานสรุปจนถึง ROSC · ย้อนกลับมาเริ่ม CPR ใหม่ได้ตลอด</p>
+          </div>
+          <div id="stageDashboardScreen" class="remote-onboarding-screen" hidden>
+            <div class="dashboard-heading"><span>CPR REPORT</span><strong>LIVE DASHBOARD</strong></div>
+            <div class="dashboard-metric-grid">
+              <div class="dash-kpi"><span>ARREST EPISODES</span><strong id="dashEpisodes">0</strong></div>
+              <div class="dash-kpi"><span>DEFIB SHOCKS</span><strong id="dashShock">0</strong></div>
+              <div class="dash-kpi"><span>EPINEPHRINE</span><strong id="dashEpi">0</strong></div>
+              <div class="dash-kpi"><span>AMIODARONE DOSES</span><strong id="dashAmio">0</strong></div>
+            </div>
+            <div class="dashboard-time-row">
+              <div class="dashboard-ccf" id="dashCcfRing"><div><strong id="dashCcf">—</strong><span>CCF EST.</span></div></div>
+              <div class="dashboard-time-metrics">
+                <div><span>TOTAL CASE</span><strong id="dashCaseTime">00:00</strong></div>
+                <div><span>CPR TIME</span><strong id="dashCprTime">00:00</strong></div>
+                <div><span>HANDS-OFF</span><strong id="dashPauseTime">00:00</strong></div>
+              </div>
+            </div>
+            <div class="dashboard-chart">
+              <strong>RECORDED RHYTHMS</strong>
+              <div class="dashboard-bar-row"><span>VF</span><div class="dashboard-bar-track"><div class="dashboard-bar vf" data-dash-bar="VF"></div></div><b data-dash-count="VF">0</b></div>
+              <div class="dashboard-bar-row"><span>pVT</span><div class="dashboard-bar-track"><div class="dashboard-bar vt" data-dash-bar="VT"></div></div><b data-dash-count="VT">0</b></div>
+              <div class="dashboard-bar-row"><span>PEA</span><div class="dashboard-bar-track"><div class="dashboard-bar pea" data-dash-bar="PEA"></div></div><b data-dash-count="PEA">0</b></div>
+              <div class="dashboard-bar-row"><span>Asystole</span><div class="dashboard-bar-track"><div class="dashboard-bar asy" data-dash-bar="Asystole"></div></div><b data-dash-count="Asystole">0</b></div>
+            </div>
+            <div class="dashboard-chart dashboard-treatment">
+              <strong>INTERVENTIONS RECORDED</strong>
+              <div id="dashTreatmentSummary" class="dashboard-treatment-list">—</div>
+            </div>
+            <button id="stageDashboardPdfBtn" type="button" class="action post-rosc-pdf">📄 EXPORT PDF</button>
+            <button id="stageDashboardBackBtn" type="button" class="stage-rosc-back">← กลับหน้าปุ่ม Re-arrest</button>
           </div>
           <div id="stageShockDecisionScreen" class="remote-onboarding-screen" hidden>
             <div class="remote-stage-heading">SHOCKABLE RHYTHM</div>
@@ -244,12 +280,66 @@
           <button id="pauseResumeBtn" class="small-control" data-action="pause">Ⅱ PAUSE CPR</button>
         </div>
         <div class="adjunct-section">
-          <div class="adjunct-heading">ADJUNCT • RECORD ONLY</div>
+          <div class="adjunct-heading">ADDITIONAL RECORDS</div>
           <div class="adjunct-buttons">
-            <button type="button" data-action="adjunct" data-value="nahco3">7.5% NaHCO₃</button>
+            <button type="button" id="bicarbToggle">7.5% NaHCO₃</button>
             <button type="button" data-action="adjunct" data-value="calcium">10% Calcium</button>
             <button type="button" data-action="adjunct" data-value="glucose">50% Glucose</button>
             <button type="button" data-action="adjunct" data-value="lidocaine">Lidocaine</button>
+            <button type="button" data-action="adjunct" data-value="prc">PRC · 1 unit</button>
+          </div>
+          <div id="bicarbDosePicker" class="bicarb-dose-picker" hidden>
+            <span>7.5% NaHCO₃ · AMOUNT RECORDED</span>
+            <div>
+              <button type="button" data-action="adjunct" data-value="nahco3_1">1 amp</button>
+              <button type="button" data-action="adjunct" data-value="nahco3_2">2 amp</button>
+            </div>
+          </div>
+        </div>
+        <div id="nonShockTools" class="reversible-tools" hidden>
+          <button type="button" id="causeToolsToggle" class="reversible-toggle">🔎 POCUS / REVERSIBLE CAUSES <span>＋</span></button>
+          <div id="causeToolsPanel" class="reversible-panel" hidden>
+            <div class="cause-tabs">
+              <button type="button" data-cause-tab="pocus" class="selected">POCUS</button>
+              <button type="button" data-cause-tab="lab">LAB</button>
+              <button type="button" data-cause-tab="trauma">TRAUMA</button>
+            </div>
+            <div class="cause-pane" data-cause-pane="pocus">
+              <div class="cause-heading">PEA · FUNCTIONAL ASSESSMENT</div>
+              <button class="cause-check" type="button" data-action="finding" data-value="pea:pseudo">Cardiac motion · possible pseudo-PEA</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="pea:true">No visible motion · possible true PEA</button>
+              <div class="cause-heading">ULTRASOUND FINDINGS · 5H/5T</div>
+              <button class="cause-check" type="button" data-action="finding" data-value="us:tamponade">Tamponade · pericardial fluid / compression</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="us:hypovolemia">Hypovolemia · small/collapsible chambers</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="us:ptx_lt">Tension PTX concern · Lt lung</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="us:ptx_rt">Tension PTX concern · Rt lung</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="us:rv_strain">Thrombosis (PE) concern · RV strain</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="us:free_fluid">Hypovolemia/Trauma · eFAST free fluid</button>
+              <p class="cause-disclaimer">POCUS only if skilled; do not prolong CPR pauses. RV strain alone ≠ PE diagnosis. Cardiac standstill alone must not determine termination.</p>
+            </div>
+            <div class="cause-pane" data-cause-pane="lab" hidden>
+              <div class="cause-heading">REVERSIBLE CAUSE · LAB CHECKLIST</div>
+              <button class="cause-check" type="button" data-action="finding" data-value="lab:gas">VBG / ABG · pH, HCO₃⁻, pCO₂ (acidosis/hypoxia)</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="lab:k">Potassium · hyper/hypokalemia</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="lab:glucose">Glucose · hypoglycemia</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="lab:ca">Ionized Ca²⁺</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="lab:mg">Magnesium</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="lab:hb">Hemoglobin / Hct · hemorrhage concern</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="lab:lactate">Lactate</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="lab:temp">Core temperature · hypothermia</button>
+              <p class="cause-disclaimer">บันทึกว่าตรวจหรือประเมินแล้ว ไม่ใช่บันทึกผลปกติ/ผิดปกติ และไม่ใช่คำสั่งตรวจอัตโนมัติ</p>
+            </div>
+            <div class="cause-pane" data-cause-pane="trauma" hidden>
+              <div class="cause-heading">TRAUMATIC ARREST</div>
+              <button class="cause-check" type="button" data-action="finding" data-value="trauma:efast">eFAST performed</button>
+              <button class="cause-check" type="button" data-action="finding" data-value="trauma:bleeding">Hemorrhage considered</button>
+              <div class="cause-heading">PROCEDURES PERFORMED · RECORD ONLY</div>
+              <div class="trauma-procedure-grid">
+                <button type="button" data-action="procedure" data-value="icd_lt">ICD · Lt</button>
+                <button type="button" data-action="procedure" data-value="icd_rt">ICD · Rt</button>
+              </div>
+              <p class="cause-disclaimer">ICD หมายถึงการลงบันทึกหัตถการที่ทำแล้ว ไม่ใช่ข้อบ่งชี้ให้ใส่ท่อระบายทรวงอก</p>
+            </div>
           </div>
         </div>
         <div class="controller-vent" id="controllerVent" hidden><span id="ventMode">30:2</span> <strong data-bind="ventTime">6</strong><span id="controllerVentLabel">NEXT BREATH</span></div>
@@ -279,7 +369,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.4 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.5 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
