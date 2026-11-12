@@ -904,3 +904,8 @@ body:not(.tv-mode) .co2-attach-overlay{display:none!important}
  body.tv-mode .rhythm-pause-banner.critical,
  body.tv-mode .stat.etco2-stat.co2-awaiting{animation:none}
 }
+
+/* V1.2: ensure hidden overrides author-level display declarations. */
+.co2-state-message[hidden],.co2-value[hidden],
+body.tv-mode .rhythm-pause-banner[hidden],
+body.tv-mode .co2-attach-overlay[hidden]{display:none!important}
