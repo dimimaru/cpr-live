@@ -257,3 +257,16 @@ guaranteed and no patient information should be stored.
 - `fromNonShockable` tracks rhythms only within the *current* arrest episode and resets on Re-CPR, whereas overall event timeline and dose/shock totals persist for the session.
 
 **Clinical caveat:** The branch-specific Amiodarone 300 mg after the second shock is an explicitly requested custom simulation rule, not a blanket ACLS recommendation. Do not use this prototype to determine a patient's medication timing, and do not enter identifiable patient data. Event delivery and countdowns cannot be guaranteed on the public realtime channel.
+
+
+## V1.2 — Automatic 2-minute rhythm check, TV CO2/Adrenaline states
+
+- TV **ADRENALINE** tile reads `NO NEED` without any epinephrine count-up until the **first documented Epinephrine dose**. In particular, selecting the first PEA/Asystole rhythm does not start a drug timer; recording the dose does. After a dose, the elapsed time counts up from that dose as before.
+- While the active Controller is connected and a rhythm has already been recorded, at **2 minutes** from the current cycle anchor it automatically broadcasts a **PAUSE** logging event marked as a cycle rhythm check. Its mobile screen switches to four large VF/pVT/PEA/Asystole choices.
+- The selected rhythm is saved while the state remains **PAUSED**. The Controller then shows a large **RESUME CPR** button. A 3-second countdown is measured from the original pause timestamp, not from rhythm selection, and changes to **red at 0**; it does not resume automatically.
+- TV displays **PAUSE CPR — IDENTIFY RHYTHM** during pauses, changes to **RHYTHM IDENTIFIED — RESUME CPR** after the cycle's rhythm choice, and turns the pause banner red after 3 seconds. Existing 10-second interruption alarm is retained. Resume logs the actual hands-off interval for CCF.
+- Pressing Resume from the cycle check starts the next two-minute cycle. A cycle-triggered Resume without a recorded new rhythm is ignored, even if an event arrives directly.
+- TV EtCO2 metric displays **AMBU 30:2** with a ventilation description while no ET-tube is reported. After ET-tube is recorded, the TV displays **ATTACH CO2 MONITOR** in the tile and in a prominent banner until the Controller reports a numeric EtCO2 value. After the first report, the tile reverts to the normal EtCO2 reading and the banner disappears.
+- The pre-intubation 30:2 mask coaching and post-intubation 6-second ventilation coaching remain visible separately.
+
+**Simulation limitations:** This automatically logs a pause in the app, but cannot detect or control real chest compressions. The automation requires an active, connected Controller in the foreground; suspended browsers, disconnected devices, clock drift or failed broadcasts may delay/miss events. A high-priority clinical timer must never rely on this public demo.
