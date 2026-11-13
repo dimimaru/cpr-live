@@ -316,3 +316,14 @@ guaranteed and no patient information should be stored.
 Clinical reference pages:
 - https://www.resus.org.uk/professional-library/2025-resuscitation-guidelines/adult-advanced-life-support-guidelines
 - https://www.resus.org.uk/professional-library/2025-resuscitation-guidelines/special-circumstances-guidelines
+
+
+## V1.6 — Cycle-separated record timeline, EtCO2-integrated ventilation, larger TV guidance
+
+- The Controller's **Live Timeline** now uses visible **EPISODE N · CYCLE N / 2 MIN** separators and displays wall-clock event time plus elapsed time relative to the beginning of its documented CPR cycle. It shows the latest 80 events instead of 12. Cycles are inferred from logged START/RE-ARREST and post-check/post-shock Resume events, not arbitrary wall-clock buckets: rhythm-check pause, rhythm selection, Clear and Shock remain in the cycle that is ending. CCF calculation and underlying event timestamps remain unchanged.
+- The **PDF chronological event log** uses the same cycle/episode separator rows and retains the event order and clock/from-start timestamps.
+- The separate TV ventilation strip is removed. The bag/mask graphic, compression/ventilation count and coach label are displayed **inside the EtCO2 card**. Before intubation the card displays **AMBU 30:2** once; duplicate 30:2 text in the coach and the redundant compression:breaths description were removed. After ET-tube placement the numerical EtCO2 and post-tube ventilation coach share the tile; the existing attach-monitor alert remains until initial EtCO2 entry.
+- The TV's **bottom clinical guidance strip** is taller, has larger type, and scrolls overflow text when necessary. Compact-screen scaling protects the main CPR timer.
+- These changes are presentation/reporting-only and do not alter CPR timer, dose anchors, shock logging, or ROSC/Re-arrest calculations.
+
+**Reminder:** This is a simulation and a manually recorded event log, not a validated CPR monitor. A cycle separator reflects recorded action events rather than a sensor-verified interval.
