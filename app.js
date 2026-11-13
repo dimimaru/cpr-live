@@ -785,7 +785,9 @@ function renderEtco2Prompt(s) {
   card.classList.toggle("co2-awaiting",waiting);
   card.classList.toggle("advanced-airway",!noTube);
   heading.textContent=noTube?"AMBU 30:2":"EtCO₂";
-  document.getElementById("ventHeading").textContent=noTube?"":"AMBU";
+  const ventHeading=document.getElementById("ventHeading");
+  ventHeading.hidden=noTube;
+  ventHeading.textContent="AMBU";
   // The ventilation coach is embedded in this same tile, so do not repeat 30:2.
   prompt.hidden=!waiting;
   normalValue.hidden=noTube||waiting;
