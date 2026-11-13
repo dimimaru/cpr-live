@@ -19,7 +19,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.6</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.7</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -81,14 +81,22 @@
               </svg>
               <div class="ecg-disclaimer">SIMULATED RHYTHM • NOT A REAL ECG</div>
             </div>
+            <div id="rhythmUsSummary" class="rhythm-us-summary" hidden>
+              <div id="peaFunctionRow" class="rhythm-us-row" hidden><span>PEA FUNCTION</span><strong id="peaFunctionValue"></strong></div>
+              <div id="positiveUsgRow" class="rhythm-us-row" hidden><span>POSITIVE USG</span><strong id="positiveUsgValue"></strong></div>
+            </div>
             </div>
             <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
             <div class="stat etco2-stat" id="co2Stat">
-              <span id="co2Heading">AMBU 30:2</span>
-              <div class="co2-state-message" id="co2StateMessage">30 COMPRESSIONS · 2 BREATHS</div>
-              <div class="co2-value" id="co2Value" hidden><strong data-bind="etco2">—</strong><small>mmHg</small></div>
-              <div class="co2-warning" id="co2Warning" hidden>⚠️ CO₂ &lt; 10 — CHECK HIGH-QUALITY CPR</div>
-              <div class="ventilator" id="ventilator" hidden>
+              <div class="co2-layout">
+                <div class="co2-reading">
+                  <span id="co2Heading">AMBU 30:2</span>
+                  <div class="co2-state-message" id="co2StateMessage" hidden>AWAITING FIRST CO₂ VALUE</div>
+                  <div class="co2-value" id="co2Value" hidden><strong data-bind="etco2">—</strong><small>mmHg</small></div>
+                  <div class="co2-warning" id="co2Warning" hidden>⚠️ CO₂ &lt; 10 — CHECK HIGH-QUALITY CPR</div>
+                </div>
+                <div class="ventilator" id="ventilator" hidden>
+                  <span class="vent-heading" id="ventHeading" hidden>AMBU</span>
           <div class="vent-ratio" id="ventRatio" hidden><span>CPR COACH</span><strong>30 : 2</strong><span>MASK VENTILATION</span></div>
           <div class="vent-visual">
             <span class="bag-icon" id="maskIcon" aria-hidden="true"><svg viewBox="0 0 110 92"><path d="M55 7 C38 8 33 25 20 44 C8 61 16 82 37 84 H73 C94 82 102 61 90 44 C77 25 72 8 55 7Z" fill="currentColor" stroke="#dbfff0" stroke-width="3"/><path d="M55 17 C46 24 38 43 30 55 Q25 70 41 72 H69 Q85 70 80 55 C72 43 64 24 55 17Z" fill="#17394a" opacity=".6"/><rect x="47" y="39" width="16" height="22" rx="5" fill="#dbfff0"/></svg></span>
@@ -104,6 +112,7 @@
             <div class="vent-time"><strong data-bind="ventTime">6</strong><span id="ventLabel">NEXT BREATH IN</span></div>
           </div>
         </div>
+              </div>
             </div>
           </div>
         </div>
@@ -369,7 +378,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.6 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.7 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
