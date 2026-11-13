@@ -766,11 +766,14 @@ function renderRhythmUltrasound(s){
   const functionValue=document.getElementById("peaFunctionValue");
   const findingsValue=document.getElementById("positiveUsgValue");
   const info=rhythmUltrasoundSummary(s);
-  functionRow.hidden=!info.functionText;
-  findingsRow.hidden=!info.positives.length;
-  area.hidden=!info.functionText&&!info.positives.length;
-  if(info.functionText)functionValue.textContent=info.functionText;
-  if(info.positives.length)findingsValue.textContent=info.positives.join("  •  ");
+  const isPea=s.rhythm==="PEA";
+  const showUs=isPea || (s.rhythm==="Asystole" && info.positives.length>0);
+  functionRow.hidden=!isPea;
+  findingsRow.hidden=!showUs;
+  area.hidden=!isPea&&!showUs;
+  if(isPea)functionValue.textContent=info.functionText||"NOT RECORDED";
+  if(showUs)findingsValue.textContent=info.positives.length?
+    info.positives.join("  •  "):"NOT RECORDED";
 }
 function renderEtco2Prompt(s) {
   const card=document.getElementById("co2Stat");
@@ -786,8 +789,8 @@ function renderEtco2Prompt(s) {
   card.classList.toggle("advanced-airway",!noTube);
   heading.textContent=noTube?"AMBU 30:2":"EtCO₂";
   const ventHeading=document.getElementById("ventHeading");
-  ventHeading.hidden=noTube;
-  ventHeading.textContent="AMBU";
+  ventHeading.hidden=false;
+  ventHeading.textContent=noTube?"AMBU 30:2":"AMBU";
   // The ventilation coach is embedded in this same tile, so do not repeat 30:2.
   prompt.hidden=!waiting;
   normalValue.hidden=noTube||waiting;
