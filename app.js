@@ -1,4 +1,4 @@
-// CPR Live v1.5 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.6 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -717,20 +717,20 @@ function renderVentilation(s,clock) {
   if(!show)return;
   const paused=s.phase==="paused";
   document.getElementById("ventMode").textContent=s.advancedAirway?"ET-TUBE":"30:2";
-  document.getElementById("ventRatio").hidden=s.advancedAirway;
+  document.getElementById("ventRatio").hidden=true; // 30:2 already appears in EtCO2 heading.
   document.getElementById("bagIcon").hidden=!s.advancedAirway;
   document.getElementById("maskIcon").hidden=s.advancedAirway;
   let number,label,mobileLabel,squeeze=false;
   if(s.advancedAirway){
     number=Math.max(1,Math.ceil((6000-clock.ventMs%6000)/1000));
     squeeze=!paused && number===1;
-    label=squeeze?"SQUEEZE BAG • 1 SECOND":"NEXT BREATH IN";
+    label=squeeze?"SQUEEZE • 1 s":"NEXT BREATH";
     mobileLabel=squeeze?"SQUEEZE BAG":"NEXT BREATH";
   }else{
     const coach=maskCoach(s,paused?s.pausedAt:Date.now());
     number=coach.breath?coach.breath+"/2":coach.count+"/30";
     squeeze=!paused&&coach.squeeze;
-    label=coach.breath?(coach.squeeze?"MASK • BREATH "+coach.breath+"/2"+" • 1.5 s":"RELEASE MASK BAG • 0.5 s"):"COMPRESSIONS • 30:2";
+    label=coach.breath?(coach.squeeze?"AMBU • 1.5 s":"RELEASE • 0.5 s"):"COMPRESSIONS";
     mobileLabel=coach.breath?(coach.squeeze?"BREATH "+coach.breath+"/2":"RELEASE"):"COMPRESSIONS";
   }
   if(paused){label=mobileLabel="CPR PAUSED";}
@@ -751,11 +751,11 @@ function renderEtco2Prompt(s) {
   const noTube=!s.advancedAirway;
   card.classList.toggle("ambu-coach",noTube);
   card.classList.toggle("co2-awaiting",waiting);
-  heading.textContent=noTube?"AMBU 30:2":waiting?"EtCO₂ MONITOR":"EtCO₂";
-  prompt.hidden=!(noTube||waiting);
+  heading.textContent=noTube?"AMBU 30:2":"EtCO₂";
+  // The ventilation coach is embedded in this same tile, so do not repeat 30:2.
+  prompt.hidden=!waiting;
   normalValue.hidden=noTube||waiting;
-  if(noTube)prompt.textContent="30 COMPRESSIONS · 2 BREATHS";
-  else if(waiting)prompt.textContent="ATTACH CO₂ MONITOR";
+  if(waiting)prompt.textContent="AWAITING FIRST CO₂ VALUE";
   overlay.hidden=!(tvMode&&waiting);
 }
 function renderAirwayAndRhythm(s) {
@@ -964,6 +964,26 @@ function renderControllerStage(s) {
       pendingActions.has("clear");
   });
 }
+// Classify recorded events by the *documented* CPR cycle boundaries.
+// The pause / rhythm check / shock remain part of the ending cycle; only the
+// first actual post-check Resume moves to the next two-minute cycle.
+function timelineWithCycles(entries){
+  let episode=0,cycle=0,anchor=null,awaitingNext=false;
+  return entries.map(entry=>{
+    const text=entry.label||"";
+    if(text==="START CPR" || text.startsWith("RE-ARREST — START CPR")){
+      episode++;cycle=1;anchor=entry.ts;awaitingNext=false;
+    }else if(text.startsWith("RESUME COMPRESSIONS — ") && awaitingNext){
+      cycle++;anchor=entry.ts;awaitingNext=false;
+    }
+    const item={...entry,episode,cycle,cycleAnchor:anchor,
+      groupKey:episode+"-"+cycle};
+    if(text.startsWith("2-MIN CYCLE — PAUSE FOR RHYTHM") ||
+       /^SHOCK #\d+$/.test(text))awaitingNext=true;
+    if(text.startsWith("ROSC —"))awaitingNext=false;
+    return item;
+  });
+}
 function render() {
   const s=computeState();
   const clock=elapsedFor(s,Date.now());
@@ -997,23 +1017,40 @@ function render() {
   document.querySelector(".live-label").className="live-label"+
     (s.phase==="running"?" active":s.phase==="paused"?" paused":"");
   const log=document.getElementById("timeline");
-  const events=s.timeline.slice(-12).reverse();
+  const events=timelineWithCycles(s.timeline).slice(-80).reverse();
   const signature=events.map(e=>e.id).join("|");
-  if (log.dataset.signature!==signature) {
+  if(log.dataset.signature!==signature){
     log.dataset.signature=signature;
     log.replaceChildren();
-    if (!events.length) {
+    if(!events.length){
       const li=document.createElement("li");
       li.className="empty";li.textContent="ยังไม่มีเหตุการณ์";log.append(li);
-    } else {
-      for (const e of events) {
+    }else{
+      let lastGroup=null;
+      for(const e of events){
+        if(e.groupKey!==lastGroup){
+          const header=document.createElement("li");
+          header.className="cycle-separator";
+          const title=document.createElement("strong");
+          title.textContent=e.episode>0?
+            "EPISODE "+e.episode+"  •  CYCLE "+e.cycle+"  /  2 MIN":
+            "SESSION EVENTS";
+          header.append(title);
+          log.append(header);
+          lastGroup=e.groupKey;
+        }
         const li=document.createElement("li");
+        li.className="timeline-event";
         const t=document.createElement("span");
         t.className="event-time";
         t.textContent=new Date(e.ts).toLocaleTimeString("th-TH",{hour12:false});
         const label=document.createElement("span");
+        label.className="event-label";
         label.textContent=e.label;
-        li.append(t,label);log.append(li);
+        const relative=document.createElement("span");
+        relative.className="event-relative";
+        relative.textContent=e.cycleAnchor===null?"":"+"+timeText(Math.max(0,e.ts-e.cycleAnchor));
+        li.append(t,label,relative);log.append(li);
       }
     }
   }
@@ -1462,7 +1499,20 @@ function buildReportElement(s){
   }
   thead.append(trh);table.append(thead);
   const tbody=document.createElement("tbody");
-  s.timeline.forEach((entry,index)=>{
+  let reportGroup=null;
+  timelineWithCycles(s.timeline).forEach((entry,index)=>{
+    if(entry.groupKey!==reportGroup){
+      const divider=document.createElement("tr");
+      divider.style.cssText="page-break-inside:avoid;break-inside:avoid;";
+      const cell=document.createElement("td");
+      cell.colSpan=4;
+      cell.textContent=entry.episode>0?
+        "EPISODE "+entry.episode+"  •  CYCLE "+entry.cycle+"  /  2-MIN CPR":
+        "SESSION EVENTS";
+      cell.style.cssText="padding:2.3mm 2mm;background:#dceef4;color:#125676;font-weight:900;border-top:1px solid #7eb2c2;letter-spacing:.03em;";
+      divider.append(cell);tbody.append(divider);
+      reportGroup=entry.groupKey;
+    }
     const tr=document.createElement("tr");
     tr.style.cssText="page-break-inside:avoid;break-inside:avoid;";
     const values=[
