@@ -1411,3 +1411,110 @@ body.tv-mode .clinical-cue{
     font-size:clamp(19px,2.5vw,31px);
   }
 }
+
+
+/* V1.7 — confirmed PEA function and positive US findings inside the rhythm tile. */
+body.tv-mode .stats>.stat.rhythm-stat .rhythm-us-summary:not([hidden]){
+  flex:0 1 auto;min-height:0;max-height:52%;width:100%;
+  display:flex;flex-direction:column;gap:3px;
+  overflow-y:auto;overflow-x:hidden;
+  padding:5px 7px;border-radius:7px;
+  border:1px solid #376f79;background:#102e40;
+}
+body.tv-mode .stats>.stat.rhythm-stat .rhythm-us-row:not([hidden]){
+  min-width:0;display:grid;grid-template-columns:minmax(85px,.35fr) minmax(0,1fr);
+  gap:7px;align-items:start;
+}
+body.tv-mode .rhythm-us-row>span{
+  font-size:clamp(9px,.78vw,13px);line-height:1.15;
+  font-weight:900;color:#78d1dd;white-space:normal;
+}
+body.tv-mode .rhythm-us-row>strong{
+  font-size:clamp(10px,.99vw,17px);line-height:1.22;
+  font-weight:800;color:#e4f7ff;overflow-wrap:anywhere;
+}
+body.tv-mode .stats>.stat.rhythm-stat:has(.rhythm-us-summary:not([hidden])) .ecg-panel{
+  max-height:clamp(24px,5vh,65px);
+}
+
+/* V1.7 — after ET tube, End-tidal and Ambu have precisely equal-width halves.
+   Before intubation the Ambu coach occupies the entire tile. */
+body.tv-mode .stats>.stat.etco2-stat .co2-layout{
+  width:100%;height:100%;min-width:0;min-height:0;
+  display:grid;grid-template-columns:minmax(0,1fr);
+  gap:0;overflow:hidden;
+}
+body.tv-mode .stats>.stat.etco2-stat.advanced-airway .co2-layout{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-reading{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:space-evenly;gap:4px;
+  min-width:0;min-height:0;
+  padding:3px 8px;
+  overflow:hidden;
+}
+body.tv-mode .stats>.stat.etco2-stat:not(.advanced-airway) .co2-reading{
+  display:none!important;
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-reading #co2Heading{
+  font-size:clamp(10px,1vw,16px);font-weight:900;
+  color:#bbdaf2;line-height:1.15;
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-reading .co2-state-message{
+  font-size:clamp(11px,1vw,16px);text-align:center;line-height:1.2;
+  overflow-wrap:anywhere;
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-reading .co2-value{
+  display:flex;align-items:baseline;justify-content:center;gap:4px;
+  max-width:100%;min-width:0;
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-reading .co2-value strong{
+  font-size:clamp(26px,3.2vw,58px)!important;
+  max-width:100%;white-space:nowrap;
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-reading .co2-warning{
+  text-align:center;font-size:clamp(9px,.8vw,12px);
+  overflow-wrap:anywhere;
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-layout .ventilator,
+body.tv-mode .stats>.stat.etco2-stat .co2-layout .ventilator.mask-coach{
+  display:flex;flex-direction:column;align-items:stretch;
+  justify-content:space-evenly;flex:1 1 auto;
+  height:100%;width:100%;min-height:0;min-width:0;
+  padding:3px 7px;margin:0;border-top:0;
+  border-radius:0;gap:2px;
+}
+body.tv-mode .stats>.stat.etco2-stat.advanced-airway .ventilator{
+  border-left:1px solid #42667b;
+}
+body.tv-mode .stats>.stat.etco2-stat .vent-heading:not([hidden]){
+  display:block;text-align:center;font-size:clamp(10px,1vw,16px);
+  line-height:1.12;font-weight:900;color:#c8eaff;
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-layout .vent-visual{
+  flex:1;min-height:0;width:100%;min-width:0;
+  display:flex;align-items:center;justify-content:center;
+  gap:clamp(3px,.55vw,10px);
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-layout .bag-icon{
+  width:clamp(26px,2.6vw,49px);height:clamp(26px,2.5vw,48px);
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-layout .vent-time strong,
+body.tv-mode .stats>.stat.etco2-stat .co2-layout .ventilator.mask-coach .vent-time strong{
+  font-size:clamp(22px,2.5vw,44px);
+}
+body.tv-mode .stats>.stat.etco2-stat .co2-layout .vent-time span{
+  font-size:clamp(9px,.9vw,14px);line-height:1.13;
+}
+@media(max-height:650px) and (min-aspect-ratio:1/1){
+  body.tv-mode .stats>.stat.rhythm-stat .rhythm-us-summary:not([hidden]){
+    padding:2px 5px;gap:2px;max-height:57%;
+  }
+  body.tv-mode .rhythm-us-row>span{font-size:9px}
+  body.tv-mode .rhythm-us-row>strong{font-size:10px}
+  body.tv-mode .stats>.stat.etco2-stat .co2-reading{padding:2px 4px}
+  body.tv-mode .stats>.stat.etco2-stat .co2-layout .ventilator{
+    padding:2px 4px;
+  }
+}
