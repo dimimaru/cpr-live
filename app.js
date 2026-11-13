@@ -1,4 +1,4 @@
-// CPR Live v1.6 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.7 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -740,6 +740,38 @@ function renderVentilation(s,clock) {
   document.getElementById("ventLabel").textContent=label;
   document.getElementById("controllerVentLabel").textContent=mobileLabel;
 }
+function rhythmUltrasoundSummary(s){
+  // Show only observations explicitly checked in the current arrest episode.
+  // Do not convert observations into diagnoses.
+  const pea=s.rhythm==="PEA";
+  const relevant=pea || s.rhythm==="Asystole";
+  const functionText=pea && s.findings["pea:pseudo"]?"CARDIAC MOTION · POSSIBLE PSEUDO-PEA":
+    pea && s.findings["pea:true"]?"NO VISIBLE MOTION · POSSIBLE TRUE PEA":null;
+  const ultrasoundKeys=[
+    ["us:tamponade","Pericardial effusion / tamponade concern"],
+    ["us:hypovolemia","Hypovolemia pattern"],
+    ["us:ptx_lt","Possible PTX · Lt"],
+    ["us:ptx_rt","Possible PTX · Rt"],
+    ["us:rv_strain","RV strain"],
+    ["us:free_fluid","eFAST free fluid"]
+  ];
+  return {functionText,positives:relevant?
+    ultrasoundKeys.filter(([key])=>!!s.findings[key]).map(([,label])=>label):[]};
+}
+function renderRhythmUltrasound(s){
+  const area=document.getElementById("rhythmUsSummary");
+  if(!area)return;
+  const functionRow=document.getElementById("peaFunctionRow");
+  const findingsRow=document.getElementById("positiveUsgRow");
+  const functionValue=document.getElementById("peaFunctionValue");
+  const findingsValue=document.getElementById("positiveUsgValue");
+  const info=rhythmUltrasoundSummary(s);
+  functionRow.hidden=!info.functionText;
+  findingsRow.hidden=!info.positives.length;
+  area.hidden=!info.functionText&&!info.positives.length;
+  if(info.functionText)functionValue.textContent=info.functionText;
+  if(info.positives.length)findingsValue.textContent=info.positives.join("  •  ");
+}
 function renderEtco2Prompt(s) {
   const card=document.getElementById("co2Stat");
   const heading=document.getElementById("co2Heading");
@@ -751,7 +783,9 @@ function renderEtco2Prompt(s) {
   const noTube=!s.advancedAirway;
   card.classList.toggle("ambu-coach",noTube);
   card.classList.toggle("co2-awaiting",waiting);
+  card.classList.toggle("advanced-airway",!noTube);
   heading.textContent=noTube?"AMBU 30:2":"EtCO₂";
+  document.getElementById("ventHeading").textContent=noTube?"":"AMBU";
   // The ventilation coach is embedded in this same tile, so do not repeat 30:2.
   prompt.hidden=!waiting;
   normalValue.hidden=noTube||waiting;
@@ -779,14 +813,11 @@ function nextMedication(s,clock){
   const epiAvailable=epiEligible &&
     (s.lastEpiAt===null || clock.epiMs>=EPI_COOLDOWN_MS);
   const amio=amiodaroneStatus(s);
-  // One slot only: Epi at shock 2 (or first nonshockable), then
-  // an eligible antiarrhythmic when appropriate. Later Epi reminders
-  // take precedence at 5 minutes since the most recent Epi.
-  const overdueEpi=epiAvailable && s.lastEpiAt!==null && clock.epiMs>=FIVE_MIN;
-  if(overdueEpi)return "epi";
-  if(amio.available && (s.epi>0 || !epiAvailable))return "amio";
-  if(epiAvailable)return "epi";
+  // One visible medication slot. If both are eligible, Amiodarone
+  // must be documented first; do not let an overdue Epi timer override it.
+  // A preparation-only Amiodarone hint does not outrank an available Epi dose.
   if(amio.available)return "amio";
+  if(epiAvailable)return "epi";
   if(amio.prepare)return "prepare";
   return "none";
 }
@@ -1175,6 +1206,7 @@ function render() {
   renderAirwayAndRhythm(s);
   renderVentilation(s,clock);
   renderECG(s);
+  renderRhythmUltrasound(s);
   renderEtco2Prompt(s);
   renderInterruption(s,clock);
   checkAlarms(s,clock);
