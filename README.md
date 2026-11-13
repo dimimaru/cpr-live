@@ -327,3 +327,13 @@ Clinical reference pages:
 - These changes are presentation/reporting-only and do not alter CPR timer, dose anchors, shock logging, or ROSC/Re-arrest calculations.
 
 **Reminder:** This is a simulation and a manually recorded event log, not a validated CPR monitor. A cycle separator reflects recorded action events rather than a sensor-verified interval.
+
+
+## V1.7 — Medication priority, PEA/US findings inside TV Rhythm, balanced EtCO₂–Ambu card
+
+- **Remote single medication slot:** if both Epinephrine and Amiodarone are eligible to be *recorded*, **Amiodarone takes visual priority**. The Epinephrine timer and dose eligibility are unaffected. A disabled Amiodarone *preparation* hint does not hide an actually due Epinephrine dose.
+- **TV Rhythm card:** under the existing Rhythm/illustrative ECG, show **PEA FUNCTION** (possible pseudo-PEA if cardiac motion was recorded; possible true PEA if no visible motion was recorded) and **POSITIVE USG** for selected positive POCUS findings. When the current rhythm is PEA, both headings are visible and an unreported value is clearly marked **NOT RECORDED**. In Asystole, only positive ultrasound findings are shown if available. For VF/pVT, this additional summary is hidden. Findings come from checkboxes within the current arrest episode; lab checklists and trauma procedures are not presented as positive ultrasound findings. The labels are observations, not proven diagnoses.
+- **TV CO₂ / AMBU card:** before ET-tube, **AMBU 30:2** occupies the whole card. After tube placement, the card becomes a balanced **50% EtCO₂ | 50% AMBU** two-column layout, including when the CO₂ sensor has not been attached yet. The existing attach-CO₂ prompt remains until first recorded value. Ventilation pacing, values, and count are unchanged.
+- No changes to CPR cycle timers, CCF, medication record timestamps, or PDF Timeline grouping.
+
+**Important:** Cardiac motion/standstill and RV strain cannot independently establish a cause or direct termination of resuscitation. This app is a simulation/documentation aid, not validated treatment guidance.
