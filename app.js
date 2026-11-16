@@ -1468,7 +1468,7 @@ async function handleAction(type,value) {
     acceptEvent(e,true); // TV only speaks; controller stays silent.
     if(type==="peaWidth"){
       causeToolsOpen=true;
-      causeTab="pocus";
+      causeTab=value==="Wide"?"lab":"pocus";
       render();
     }
   } catch(err) {
