@@ -19,7 +19,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.7</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.8</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -85,8 +85,12 @@
               <div id="peaFunctionRow" class="rhythm-us-row" hidden><span>PEA FUNCTION</span><strong id="peaFunctionValue"></strong></div>
               <div id="positiveUsgRow" class="rhythm-us-row" hidden><span>POSITIVE USG</span><strong id="positiveUsgValue"></strong></div>
             </div>
+            <div id="rhythmMedLabSummary" class="rhythm-record-summary" hidden>
+              <div id="rhythmOtherMedsRow" class="rhythm-record-row" hidden><span>OTHER MEDS</span><strong id="rhythmOtherMedsValue"></strong></div>
+              <div id="rhythmLabsRow" class="rhythm-record-row" hidden><span>LAB CHECKED</span><strong id="rhythmLabsValue"></strong></div>
             </div>
-            <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
+            </div>
+            <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER</span><strong data-bind="epiDisplay">NO NEED</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
             <div class="stat etco2-stat" id="co2Stat">
               <div class="co2-layout">
                 <div class="co2-reading">
@@ -208,20 +212,16 @@
           </div>
           <div id="stageShockDecisionScreen" class="remote-onboarding-screen" hidden>
             <div class="remote-stage-heading">SHOCKABLE RHYTHM</div>
-            <p class="remote-stage-guidance">Keep chest compressions going while charging when possible</p>
+            <p class="remote-stage-guidance">เครื่องพร้อมแล้ว: พูด CLEAR และยืนยันทุกคนถอย ก่อนกดบันทึก SHOCK</p>
+            <button id="shockButtonDirect" type="button" data-action="shock" class="action shock remote-stage-shock-button">⚡ SHOCK <small>🗣 CLEAR FIRST</small></button>
             <button type="button" data-action="charge" class="action remote-flow-charge">
-              ▶ RESUME CPR <small>(CHARGING)</small>
-            </button>
-            <button type="button" data-action="clear" class="action remote-flow-clear">
-              ✋ CLEAR <small>(CHARGE READY)</small>
+              ▶ CONTINUE CPR <small>WAIT FOR CHARGE</small>
             </button>
           </div>
           <div id="stageChargingScreen" class="remote-onboarding-screen" hidden>
-            <div class="remote-stage-heading">DEFIB CHARGING</div>
-            <p class="remote-stage-guidance">COMPRESSIONS CONTINUE</p>
-            <button type="button" data-action="clear" class="action remote-flow-clear">
-              ✋ CLEAR <small>(CHARGE READY)</small>
-            </button>
+            <div class="remote-stage-heading">CONTINUE CPR · CHARGING</div>
+            <p class="remote-stage-guidance">กดหน้าอกต่อระหว่างรอชาร์จ · เมื่อเครื่องพร้อม ให้พูด CLEAR ก่อน SHOCK</p>
+            <button id="shockButtonCharging" type="button" data-action="shock" class="action shock remote-stage-shock-button">⚡ SHOCK <small>🗣 CLEAR FIRST</small></button>
           </div>
           <div id="stageShockScreen" class="remote-onboarding-screen" hidden>
             <div class="remote-stage-heading">CLEAR — READY TO SHOCK</div>
@@ -231,7 +231,7 @@
               <span id="stageShockElapsed">HANDS-OFF 0.0 s</span>
             </div>
             <div class="shock-control">
-              <button id="shockButton" type="button" data-action="shock" class="action shock remote-stage-shock-button">⚡ SHOCK</button>
+              <button id="shockButton" type="button" data-action="shock" class="action shock remote-stage-shock-button">⚡ SHOCK · CLEAR FIRST</button>
               <span id="shockCooldownHint" class="shock-cooldown-hint" hidden></span>
             </div>
           </div>
@@ -306,15 +306,34 @@
           </div>
         </div>
         <div id="nonShockTools" class="reversible-tools" hidden>
-          <button type="button" id="causeToolsToggle" class="reversible-toggle">🔎 POCUS / REVERSIBLE CAUSES <span>＋</span></button>
+          <button type="button" id="causeToolsToggle" class="reversible-toggle">🔎 POCUS / REVERSIBLE CAUSES · ALL RHYTHMS <span>＋</span></button>
           <div id="causeToolsPanel" class="reversible-panel" hidden>
+            <div id="qrsInvestigations" class="qrs-investigations" hidden>
+              <div id="qrsNarrowChecklist" class="qrs-checklist" hidden>
+                <div class="cause-heading">NARROW QRS PEA · MECHANICAL CAUSES TO INVESTIGATE</div>
+                <button class="cause-check" type="button" data-action="finding" data-value="qrs:n:tamponade">Cardiac tamponade · cardiac POCUS assessed</button>
+                <button class="cause-check" type="button" data-action="finding" data-value="qrs:n:ptx">Tension PTX · lung US / exam assessed</button>
+                <button class="cause-check" type="button" data-action="finding" data-value="qrs:n:pe">Pulmonary PE · risk / RV / DVT assessed</button>
+                <button class="cause-check" type="button" data-action="finding" data-value="qrs:n:volume">Hypovolemia or bleeding · eFAST assessed</button>
+                <button class="cause-check" type="button" data-action="finding" data-value="qrs:n:airway">Dynamic hyperinflation / airway assessed</button>
+              </div>
+              <div id="qrsWideChecklist" class="qrs-checklist" hidden>
+                <div class="cause-heading">WIDE QRS PEA · METABOLIC / CARDIAC CAUSES TO INVESTIGATE</div>
+                <button class="cause-check" type="button" data-action="finding" data-value="qrs:w:potassium">Potassium · blood gas / electrolytes checked</button>
+                <button class="cause-check" type="button" data-action="finding" data-value="qrs:w:acidbase">Severe acid-base disturbance evaluated</button>
+                <button class="cause-check" type="button" data-action="finding" data-value="qrs:w:tox">Na-channel blocker toxicity reviewed</button>
+                <button class="cause-check" type="button" data-action="finding" data-value="qrs:w:temp">Core temperature assessed</button>
+                <button class="cause-check" type="button" data-action="finding" data-value="qrs:w:cardiac">Ischemia / pump failure considered</button>
+              </div>
+              <p class="cause-disclaimer">QRS width is a prompt to investigate, not a diagnosis. These checks remain accessible in other rhythms.</p>
+            </div>
             <div class="cause-tabs">
               <button type="button" data-cause-tab="pocus" class="selected">POCUS</button>
               <button type="button" data-cause-tab="lab">LAB</button>
               <button type="button" data-cause-tab="trauma">TRAUMA</button>
             </div>
             <div class="cause-pane" data-cause-pane="pocus">
-              <div class="cause-heading">PEA · FUNCTIONAL ASSESSMENT</div>
+              <div class="cause-heading">PEA · FUNCTIONAL ASSESSMENT (PEA ONLY)</div>
               <button class="cause-check" type="button" data-action="finding" data-value="pea:pseudo">Cardiac motion · possible pseudo-PEA</button>
               <button class="cause-check" type="button" data-action="finding" data-value="pea:true">No visible motion · possible true PEA</button>
               <div class="cause-heading">ULTRASOUND FINDINGS · 5H/5T</div>
@@ -378,7 +397,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.7 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.8 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
