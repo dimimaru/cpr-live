@@ -1911,3 +1911,101 @@ body:not(.tv-mode).remote-stage-dashboard #stageDashboardReArrestBtn{
   background:#0d7657;color:#fff;
   font-size:clamp(18px,4.5vw,27px);font-weight:900;
 }
+
+/* V2.1 — Rhythm tile fills its allocated TV grid area after LAB/MED moved out. */
+body.tv-mode .stats>.stat.rhythm-stat{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:stretch;
+  padding:clamp(6px,.75vw,14px)!important;
+  gap:clamp(4px,.7vh,12px)!important;
+}
+body.tv-mode .stats>.stat.rhythm-stat>span{
+  flex:0 0 auto;
+  font-size:clamp(12px,1.08vw,18px);
+  font-weight:900;
+  color:#9fbdd9;
+}
+body.tv-mode .stats>.stat.rhythm-stat .rhythm{
+  flex:0 0 auto;
+  font-size:clamp(22px,3vw,52px)!important;
+  line-height:1.03;
+  margin:0;
+  text-align:center;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+body.tv-mode .stats>.stat.rhythm-stat .ecg-panel:not([hidden]){
+  flex:1 1 0;
+  min-height:clamp(40px,7vh,85px);
+  max-height:none!important;
+  height:auto;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:clamp(2px,.3vh,5px);
+  padding:clamp(3px,.5vw,9px);
+  border-radius:9px;
+  border-color:#2a6f61;
+  background:#071e21;
+}
+body.tv-mode .stats>.stat.rhythm-stat .ecg-heading{
+  flex:0 0 auto;
+  font-size:clamp(9px,.82vw,14px);
+}
+body.tv-mode .stats>.stat.rhythm-stat .ecg-heading strong{
+  font-size:clamp(10px,1vw,17px);
+}
+body.tv-mode .stats>.stat.rhythm-stat .ecg-monitor{
+  display:block;flex:1 1 auto;min-height:0;height:100%;
+}
+body.tv-mode .stats>.stat.rhythm-stat .ecg-disclaimer{
+  font-size:clamp(8px,.65vw,11px);flex:0 0 auto;
+}
+body.tv-mode .stats>.stat.rhythm-stat .rhythm-us-summary:not([hidden]){
+  flex:0 1 auto;
+  max-height:36%;
+  padding:clamp(5px,.45vw,9px);
+  gap:clamp(3px,.35vh,7px);
+}
+body.tv-mode .stats>.stat.rhythm-stat .rhythm-us-row>span{
+  font-size:clamp(9px,.85vw,15px);
+}
+body.tv-mode .stats>.stat.rhythm-stat .rhythm-us-row>strong{
+  font-size:clamp(10px,1vw,17px);
+}
+/* When ECG has not been attached, the tile clearly indicates why no trace is displayed. */
+body.tv-mode .stats>.stat.rhythm-stat.ecg-leads-pending{
+  justify-content:center;
+  align-items:center;
+  background:linear-gradient(140deg,#183249,#10263d);
+}
+body.tv-mode .stats>.stat.rhythm-stat.ecg-leads-pending .rhythm{
+  font-size:clamp(24px,3vw,51px)!important;
+  color:#ffd28a;
+}
+body:not(.tv-mode) .remote-wait-ecg{
+  width:100%;max-width:740px;
+  min-height:clamp(62px,10vh,96px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;
+  font-size:clamp(16px,4vw,22px);font-weight:900;
+  border:2px solid #7ed9e3;border-radius:15px;
+  background:#15506b;color:#f0fcff;
+}
+body:not(.tv-mode) .remote-wait-ecg small{
+  font-size:clamp(12px,3vw,17px);
+  font-weight:850;color:#c5f2ef;
+}
+body:not(.tv-mode) .remote-secondary #pauseResumeBtn{
+  background:#165172;border:2px solid #56b7de;
+}
+@media(max-height:650px) and (min-aspect-ratio:1/1){
+  body.tv-mode .stats>.stat.rhythm-stat .rhythm{
+    font-size:clamp(18px,2.5vw,35px)!important;
+  }
+  body.tv-mode .stats>.stat.rhythm-stat .ecg-panel:not([hidden]){
+    min-height:clamp(28px,6vh,52px);
+  }
+}
