@@ -62,7 +62,11 @@
             <div class="clock" data-bind="cycle">02:00</div>
             <div class="small-display">TOTAL CASE TIME <span data-bind="elapsed">00:00</span></div>
             <div class="episode-display">ARREST EPISODE <strong data-bind="episode">0</strong></div>
-
+            <div class="tv-clock-footer" aria-label="Documented CPR hands-off and cumulative chest compression fraction">
+              <div><span>HANDS-OFF NOW</span><strong data-bind="pauseCurrent">0.0 s</strong></div>
+              <div><span>HANDS-OFF TOTAL</span><strong data-bind="pauseTotal">00:00</strong></div>
+              <div><span>CCF · ALL EPISODES</span><strong data-bind="ccf">—</strong></div>
+            </div>
           </div>
           <div class="stats">
             <div class="stat shock-count-stat"><span>SHOCK</span><strong data-bind="shock">0</strong></div>
