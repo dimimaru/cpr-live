@@ -1640,3 +1640,52 @@ body.tv-mode .stats>.stat.etco2-stat.advanced-airway .co2-value strong{
   body.tv-mode .rhythm-record-row>strong{font-size:10px}
   body.tv-mode .rhythm-record-row>span{font-size:9px}
 }
+
+
+/* V1.9 — small, bottom-anchored TV clock metrics; cumulative across all arrest
+   episodes, excluding ROSC from the compression-fraction denominator. */
+.tv-clock-footer{display:none}
+body.tv-mode .timer-stack{
+  position:relative;
+  padding-bottom:clamp(31px,5vh,48px);
+}
+body.tv-mode .tv-clock-footer{
+  position:absolute;
+  inset:auto 2% clamp(2px,.65vh,9px) 2%;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:clamp(3px,.65vw,12px);
+  width:96%;
+  align-items:end;
+  padding:clamp(3px,.5vh,7px) clamp(3px,.6vw,10px);
+  background:rgba(16,35,57,.72);
+  border-top:1px solid #34516f;
+  border-radius:7px;
+  text-align:center;
+  pointer-events:none;
+}
+body.tv-mode .tv-clock-footer>div{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  min-width:0;overflow:hidden;
+}
+body.tv-mode .tv-clock-footer span{
+  color:#88a8c4;
+  font-size:clamp(8px,.72vw,11px);
+  font-weight:750;
+  letter-spacing:.025em;
+  white-space:nowrap;
+}
+body.tv-mode .tv-clock-footer strong{
+  color:#e7f6ff;
+  font-size:clamp(12px,1.22vw,19px);
+  line-height:1.1;font-weight:850;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+body.tv-mode .tv-clock-footer>div:last-child strong{color:#62deba}
+@media(max-height:650px) and (min-aspect-ratio:1/1){
+  body.tv-mode .timer-stack{padding-bottom:29px}
+  body.tv-mode .tv-clock-footer{padding:2px 3px;bottom:1px;gap:2px}
+  body.tv-mode .tv-clock-footer span{font-size:clamp(7px,.65vw,10px)}
+  body.tv-mode .tv-clock-footer strong{font-size:clamp(11px,1.05vw,16px)}
+}
