@@ -29,7 +29,7 @@ if(tvMode){
   document.title="CPR Live Monitor";
 }
 const DEVICE_ID = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + "-" + Math.random();
-const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2","charge","clear","adjunct","finding","procedure"]);
+const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2","charge","clear","adjunct","finding","procedure","display"]);
 const TWO_MIN = 120000;
 const FOUR_MIN = 240000;
 const SHOCK_COOLDOWN_MS = 100000; // 1 min 40 seconds for duplicate SHOCK logs
@@ -161,7 +161,7 @@ function blankState() {
     adjunctCounts:{},
     peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,coachAnchor:null,
     findings:{},procedures:{},
-    metronomeOn:true,lastActionAt:{},timeline:[]
+    metronomeOn:true,tvDashboard:false,lastActionAt:{},timeline:[]
   };
 }
 function chronological() {
@@ -190,6 +190,7 @@ function computeState() {
         s.shock=0;s.lastShockAt=null;s.lastEpiAt=null;s.epi=0;s.amioDoses=[];s.etco2=null;s.advancedAirway=false;s.ventAnchor=null;s.timeline=[];
       }
       s.episode++;
+      s.tvDashboard=false; // Re-arrest immediately restores every TV monitor.
       s.phase="running";
       s.cycleAnchor=t;
       s.episodeStartAt=t;
@@ -278,6 +279,7 @@ function computeState() {
       s.shockFlow=null;
       s.clearAt=null;
       s.phase="rosc";
+      s.tvDashboard=false; // Only a subsequent Remote dashboard request changes the TV.
       line(s,e,"ROSC — CPR STOPPED");
     } else if (["running","paused"].includes(s.phase) && e.type === "shock") {
       // Shared event-source guard: only the earliest shock in each 100s window
@@ -369,6 +371,9 @@ function computeState() {
       // Sync metronome setting silently: no Timeline entry or spoken feedback.
       s.metronomeOn=e.value;
       s.lastActionAt.metro=t;
+    } else if (e.type==="display" && s.phase==="rosc" && ["dashboard","monitor"].includes(e.value)) {
+      // A synchronised display state, not a clinical intervention or timeline event.
+      s.tvDashboard=e.value==="dashboard";
     } else if (["running","paused","rosc"].includes(s.phase) && e.type === "etco2" &&
       s.advancedAirway && Number.isInteger(e.value) && e.value>=0 && e.value<=150) {
       s.etco2=e.value;
@@ -839,11 +844,11 @@ function renderRhythmMedLab(s){
   const meds=document.getElementById("rhythmOtherMedsRow");
   const labs=document.getElementById("rhythmLabsRow");
   const data=recordedMedLabSummary(s);
-  meds.hidden=!data.meds.length;
-  labs.hidden=!data.labs.length;
-  panel.hidden=!data.meds.length&&!data.labs.length;
-  if(data.meds.length)document.getElementById("rhythmOtherMedsValue").textContent=data.meds.join(" · ");
-  if(data.labs.length)document.getElementById("rhythmLabsValue").textContent=data.labs.join(" · ");
+  meds.hidden=false;
+  labs.hidden=false;
+  panel.hidden=false;
+  document.getElementById("rhythmOtherMedsValue").textContent=data.meds.join(" · ")||"—";
+  document.getElementById("rhythmLabsValue").textContent=data.labs.join(" · ")||"—";
 }
 function renderRhythmUltrasound(s){
   const area=document.getElementById("rhythmUsSummary");
@@ -1009,6 +1014,59 @@ function renderReportDashboard(s,clock){
     }
   }
 }
+function renderTvReportDashboard(s,clock){
+  if(!tvMode)return;
+  const active=s.phase==="rosc" && !!s.tvDashboard;
+  document.body.classList.toggle("tv-dashboard-active",active);
+  const area=document.getElementById("tvReportDashboard");
+  if(!area)return;
+  area.hidden=!active;
+  if(!active)return;
+  const put=(id,value)=>{const el=document.getElementById(id);if(el && el.textContent!==String(value))el.textContent=String(value);};
+  put("tvDashEpisodes",s.episode);
+  put("tvDashShock",s.shock);
+  put("tvDashEpi",s.epi);
+  put("tvDashAmio",s.amioDoses.length?s.amioDoses.join(" + ")+" mg":"—");
+  put("tvDashCcf",clock.ccf===null?"—":clock.ccf.toFixed(1)+"%");
+  put("tvDashCaseTime",timeText(clock.totalMs));
+  put("tvDashCprTime",timeText(clock.arrestMs));
+  put("tvDashPauseTime",timeText(clock.pauseMs));
+  const percentage=clock.ccf===null?0:Math.min(100,Math.max(0,clock.ccf));
+  document.getElementById("tvDashCcfRing").style.background=
+    "conic-gradient(#20ba94 0% "+percentage+"%,#cc5369 "+percentage+"% 100%)";
+  const counts={VF:0,VT:0,PEA:0,Asystole:0};
+  for(const item of s.timeline){
+    if(!item.label.startsWith("RHYTHM: "))continue;
+    const r=item.label.slice(8).trim();
+    const key=r==="pVT"?"VT":r;
+    if(Object.prototype.hasOwnProperty.call(counts,key))counts[key]++;
+  }
+  const max=Math.max(1,...Object.values(counts));
+  document.querySelectorAll("[data-tv-dash-bar]").forEach(el=>{
+    const key=el.dataset.tvDashBar;
+    el.style.width=(counts[key]*100/max)+"%";
+  });
+  document.querySelectorAll("[data-tv-dash-count]").forEach(el=>{el.textContent=counts[el.dataset.tvDashCount]||0;});
+  const records=recordedMedLabSummary(s);
+  const meds=[...records.meds];
+  if(s.epi)meds.unshift("EPINEPHRINE ×"+s.epi);
+  if(s.amioDoses.length)meds.push("AMIODARONE "+s.amioDoses.join(" + ")+" mg");
+  put("tvDashMeds",meds.join(" · ")||"—");
+  put("tvDashLabs",records.labs.join(" · ")||"—");
+  const us=rhythmUltrasoundSummary(s);
+  // POCUS findings are episode-scoped: do not claim historical positives from
+  // a prior episode after re-arrest. The TV lists current checked findings.
+  const positives=[
+    ["us:tamponade","Pericardial effusion / tamponade concern"],
+    ["us:hypovolemia","Hypovolemia pattern"],
+    ["us:ptx_lt","Possible PTX Lt"],["us:ptx_rt","Possible PTX Rt"],
+    ["us:rv_strain","RV strain"],["us:free_fluid","Free fluid"]
+  ].filter(([key])=>s.findings[key]).map(([,label])=>label);
+  put("tvDashPocus",positives.join(" · ")||"—");
+  const procedures=Object.entries(s.procedures)
+    .filter(([,checked])=>!!checked).map(([key])=>PROCEDURE_NAMES[key]||key);
+  put("tvDashProcedures",procedures.join(" · ")||"—");
+}
 function renderControllerStage(s) {
   if(tvMode)return;
   if(roscReviewOpen && !roscSelectionAvailable(s))roscReviewOpen=false;
@@ -1016,8 +1074,7 @@ function renderControllerStage(s) {
   const choosing=["running","paused"].includes(s.phase) && s.rhythm==="—";
   const flow=s.shockFlow;
   if(s.phase==="rosc" || s.phase==="standby")roscReviewOpen=false;
-  if(s.phase!=="rosc")dashboardOpen=false;
-  const stage=s.phase==="rosc"?(dashboardOpen?"dashboard":"reArrest"):
+  const stage=s.phase==="rosc"?(s.tvDashboard?"dashboard":"reArrest"):
     s.phase==="standby"?"start":
     roscReviewOpen?"roscReview":
     flow==="decision"?"decision":
@@ -1136,8 +1193,7 @@ function render() {
       if (n.textContent!==String(val)) n.textContent=val;
     });
   }
-  document.getElementById("epiReminderTitle").textContent=
-    s.lastEpiAt===null?"ADRENALINE":"ADRENALINE TIMER";
+  // Epinephrine timing is now inside the EPINEPHRINE tally tile on TV.
   document.getElementById("amio300Badge").classList.toggle("administered",s.amioDoses.includes(300));
   document.getElementById("amio150Badge").classList.toggle("administered",s.amioDoses.includes(150));
   document.getElementById("roscChecklist").hidden=s.phase!=="rosc";
@@ -1247,11 +1303,9 @@ function render() {
   epiButton.classList.toggle("epi-highlight",epiState==="green" && !epiLocked);
   epiButton.classList.toggle("epi-muted",epiState==="neutral" || epiLocked);
   epiButton.classList.toggle("epi-urgent",epiState==="red" && !epiLocked);
-  document.getElementById("epiStat").classList.toggle("due",epiState==="red");
-  document.getElementById("epiStat").classList.toggle("epi-green",epiState==="green");
-  document.getElementById("epiStat").classList.toggle("undosed",s.lastEpiAt===null);
   document.getElementById("epiCountHalf").classList.toggle("epi-urgent",epiState==="red");
   document.getElementById("epiCountHalf").classList.toggle("epi-green",epiState==="green");
+  document.getElementById("epiCountHalf").classList.toggle("undosed",s.lastEpiAt===null);
   const epiHint=document.getElementById("epiLockHint");
   epiHint.hidden=true;
   epiButton.classList.toggle("epi-locked",epiLocked);
@@ -1300,6 +1354,7 @@ function render() {
   renderECG(s);
   renderRhythmUltrasound(s);
   renderRhythmMedLab(s);
+  renderTvReportDashboard(s,clock);
   renderEtco2Prompt(s);
   renderInterruption(s,clock);
   checkAlarms(s,clock);
@@ -1329,6 +1384,7 @@ function validEvent(obj) {
   if (obj.type==="rhythm" && !["VF","VT","PEA","Asystole"].includes(obj.value))return false;
   if (obj.type==="peaWidth" && !["Narrow","Wide"].includes(obj.value))return false;
   if (obj.type==="metro" && typeof obj.value!=="boolean")return false;
+  if (obj.type==="display" && !["dashboard","monitor"].includes(obj.value))return false;
   if (obj.type==="amio" && obj.value!==300 && obj.value!==150)return false;
   if (obj.type==="adjunct" && !ADJUNCT_NAMES[obj.value])return false;
   if (obj.type==="finding" && !FINDING_LABELS[obj.value])return false;
@@ -1362,6 +1418,7 @@ async function handleAction(type,value) {
   if (!connected || tvMode)return;
   const s=computeState();
   if (type==="start" && !["standby","rosc"].includes(s.phase))return;
+  if (type==="display" && (s.phase!=="rosc" || !["dashboard","monitor"].includes(value)))return;
   if (type==="pause" && s.phase!=="running")return;
   if (type==="resume" && s.phase!=="paused")return;
   if(type==="resume" && s.pauseReason==="cycle" && !s.pauseRhythmRecorded)return;
@@ -1766,12 +1823,10 @@ if(!tvMode){
   document.getElementById("stageDashboardPdfBtn").addEventListener("click",exportTimelinePDF);
   document.getElementById("stageDashboardBtn").addEventListener("click",()=>{
     if(computeState().phase!=="rosc")return;
-    dashboardOpen=true;
-    render();
+    void handleAction("display","dashboard");
   });
   document.getElementById("stageDashboardBackBtn").addEventListener("click",()=>{
-    dashboardOpen=false;
-    render();
+    void handleAction("display","monitor");
   });
   document.getElementById("bicarbToggle").addEventListener("click",()=>{
     const s=computeState();
