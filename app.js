@@ -1121,7 +1121,7 @@ function render() {
       s.phase==="rosc"?"ROSC — MONITORING":"STANDBY",
     cycle:timeText(currentCycle),
     elapsed:timeText(clock.totalMs),
-    epiTime:s.lastEpiAt===null?"NO NEED":timeText(clock.epiMs),
+    epiTime:s.lastEpiAt===null?(firstDoseStatus?firstDoseStatus.display.replace(" ADRENALINE",""):"NO NEED"):timeText(clock.epiMs),
     epiDisplay:s.lastEpiAt===null?(firstDoseStatus?.display||"NO NEED"):timeText(clock.epiMs),
     epiReminder:s.lastEpiAt===null?(firstDoseStatus?.hint||"NOT YET INDICATED"):
       clock.epiMs>=280000?"EPINEPHRINE DUE SOON / DUE":
