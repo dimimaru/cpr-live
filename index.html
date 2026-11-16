@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="./assets/cpr-remote-180.png">
   <link rel="icon" sizes="192x192" type="image/png" href="./assets/cpr-remote-192.png">
   <link rel="icon" type="image/svg+xml" href="./assets/cpr-remote.svg">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=2.0.0">
 </head>
 <body class="remote-stage-start">
   <div class="app">
@@ -221,6 +221,7 @@
               <strong>INTERVENTIONS RECORDED</strong>
               <div id="dashTreatmentSummary" class="dashboard-treatment-list">—</div>
             </div>
+            <button id="stageDashboardReArrestBtn" type="button" data-action="start" class="action remote-rearrest-small">▶ RE-ARREST · START CPR</button>
             <button id="stageDashboardPdfBtn" type="button" class="action post-rosc-pdf">📄 EXPORT PDF</button>
             <button id="stageDashboardBackBtn" type="button" class="stage-rosc-back">← กลับหน้าปุ่ม Re-arrest</button>
           </div>
@@ -417,6 +418,6 @@
     </footer>
   </div>
   <script src="./config.js"></script>
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./app.js?v=2.0.0"></script>
 </body>
 </html>
