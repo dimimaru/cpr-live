@@ -337,3 +337,20 @@ Clinical reference pages:
 - No changes to CPR cycle timers, CCF, medication record timestamps, or PDF Timeline grouping.
 
 **Important:** Cardiac motion/standstill and RV strain cannot independently establish a cause or direct termination of resuscitation. This app is a simulation/documentation aid, not validated treatment guidance.
+
+
+## V1.8 — Direct Shock recording, pre-dose Adrenaline prompts, QRS investigations, TV layout
+
+- **Direct Shock recording on Remote:** After selecting VF/pVT, the operator sees **SHOCK · CLEAR FIRST** and **CONTINUE CPR · WAIT FOR CHARGE**. Selecting Continue records CPR continuing while the defibrillator charges; once ready, the interface presents SHOCK directly. The earlier separate CLEAR recording button is removed from the new flow, but historical CLEAR events remain readable. A Shock tap records a manual CLEAR FIRST–SHOCK event and transitions to the existing explicit Resume CPR screen. The button is a recorder action, **not a physical defibrillator control**.
+- **CCF caveat:** If CPR was ongoing during charging, the app marks the compression interruption at the Shock record tap. If a rhythm-assessment pause was already in progress, that entire earlier pause remains counted. Actual real-world clearing/defibrillation may begin earlier than the button tap; manual CCF therefore remains an estimate, not a sensor measurement.
+- **First nonshockable Adrenaline:** Selecting PEA/Asystole starts a separate 2-minute *overdue visual reminder* for the first missing dose: green immediately, red if no dose is recorded after 2 minutes. This **is not an instruction to delay** Adrenaline; the guideline recommendation is as soon as feasible. The first-dose medication interval does not count until a dose has been logged. Remote's first-dose button and quick status say SUGGEST ADRENALINE.
+- **TV Adrenaline display:** Before the first logged dose, show **SUGGEST ADRENALINE** after a nonshockable rhythm, **CONSIDER ADRENALINE** following Shock #2 in a shockable pathway, and **NO NEED** before that threshold. After the first dose, resume the existing numeric dose-interval timer. The local after-second-shock cue follows the chosen prototype workflow; different clinical guideline sets may specify different shock thresholds.
+- **Narrow/Wide QRS investigations:** Choosing Narrow or Wide PEA QRS automatically opens a tailored reversible-cause investigation checklist. Narrow emphasizes mechanical considerations (tamponade, tension pneumothorax, pulmonary PE, hypovolemia/hemorrhage, dynamic hyperinflation); Wide emphasizes potassium/electrolytes, acid-base, sodium-channel blockade, temperature, and cardiac ischemia/pump failure. The choice and completed investigations remain accessible while CPR continues, even if the rhythm later changes. QRS-width categories are teaching prompts, **not validated diagnostic criteria**.
+- **POCUS / REVERSIBLE CAUSES** remains available across VF/pVT, PEA, and Asystole, including the Shockable decision and Charging screens. PEA functional classification itself can be checked only in PEA. Other POCUS, laboratory checklists, and documented Trauma/ICD entries remain accessible in all active rhythms.
+- **TV LAST RHYTHM** gains compact **OTHER MEDS** and **LAB CHECKED** rows derived from actually logged adjunct events and currently checked lab investigations in the session. A checked Lab is not proof that a test was ordered or returned. The existing PEA function and positive POCUS rows are preserved.
+- **TV EtCO₂/AMBU** after advanced airway now shows precisely equal **upper EtCO₂ / lower AMBU** halves (instead of left/right). Before intubation the AMBU 30:2 coach still occupies the full tile.
+
+Clinical references:
+- AHA 2025 adult ALS: https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines/adult-advanced-life-support/
+- RCUK/ERC 2025 ALS: https://www.resus.org.uk/professional-library/2025-resuscitation-guidelines/adult-advanced-life-support-guidelines
+- Narrow/Wide PEA teaching hypothesis and limitations: https://pmc.ncbi.nlm.nih.gov/articles/PMC5586830/
