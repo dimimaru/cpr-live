@@ -885,15 +885,17 @@ function roscSelectionAvailable(s){
 function renderCauseTools(s){
   if(tvMode)return;
   const active=["running","paused"].includes(s.phase);
-  const nonshock=active && ["PEA","Asystole"].includes(s.rhythm);
-  if(!active)bicarbPickerOpen=false;
-  if(!nonshock){causeToolsOpen=false;causeTab="pocus";}
+  if(!active){bicarbPickerOpen=false;causeToolsOpen=false;causeTab="pocus";}
   const tool=document.getElementById("nonShockTools");
-  tool.hidden=!nonshock;
-  document.getElementById("causeToolsPanel").hidden=!nonshock||!causeToolsOpen;
+  tool.hidden=!active; // POCUS, lab and trauma remain available for VF/pVT too.
+  document.getElementById("causeToolsPanel").hidden=!active||!causeToolsOpen;
   const toggle=document.getElementById("causeToolsToggle");
-  toggle.disabled=!connected || !nonshock;
-  toggle.setAttribute("aria-expanded",String(nonshock && causeToolsOpen));
+  toggle.disabled=!connected || !active;
+  toggle.setAttribute("aria-expanded",String(active && causeToolsOpen));
+  const hasQrs=active && !!s.lastPeaWidth;
+  document.getElementById("qrsInvestigations").hidden=!hasQrs;
+  document.getElementById("qrsNarrowChecklist").hidden=!hasQrs||s.lastPeaWidth!=="Narrow";
+  document.getElementById("qrsWideChecklist").hidden=!hasQrs||s.lastPeaWidth!=="Wide";
   document.querySelectorAll("[data-cause-tab]").forEach(btn=>{
     btn.classList.toggle("selected",btn.dataset.causeTab===causeTab);
   });
@@ -902,16 +904,16 @@ function renderCauseTools(s){
   });
   document.querySelectorAll(".cause-check").forEach(btn=>{
     btn.classList.toggle("selected",!!s.findings[btn.dataset.value]);
-    btn.disabled=!connected || !nonshock ||
+    btn.disabled=!connected || !active ||
       (btn.dataset.value.startsWith("pea:")&&s.rhythm!=="PEA") ||
+      (btn.dataset.value.startsWith("qrs:")&&!s.lastPeaWidth) ||
       actionCooldownRemaining(s,"finding",Date.now(),btn.dataset.value)>0 ||
       pendingActions.has("finding");
     btn.setAttribute("aria-pressed",String(!!s.findings[btn.dataset.value]));
   });
   document.querySelectorAll(".trauma-procedure-grid button").forEach(btn=>{
     const done=!!s.procedures[btn.dataset.value];
-    btn.disabled=!connected || !nonshock || done ||
-      pendingActions.has("procedure");
+    btn.disabled=!connected || !active || done || pendingActions.has("procedure");
     btn.classList.toggle("selected",done);
     btn.textContent=(PROCEDURE_NAMES[btn.dataset.value]||"ICD")+(done?" ✓":"");
   });
@@ -1333,15 +1335,16 @@ async function handleAction(type,value) {
   if(type==="clear" && !["decision","charging"].includes(s.shockFlow))return;
   if(type==="adjunct" && (!["running","paused"].includes(s.phase) || !ADJUNCT_NAMES[value]))return;
   if(type==="finding" && (!["running","paused"].includes(s.phase) ||
-      !["PEA","Asystole"].includes(s.rhythm) || !FINDING_LABELS[value]))return;
+      !FINDING_LABELS[value] || (value.startsWith("pea:") && s.rhythm!=="PEA") ||
+      (value.startsWith("qrs:") && !s.lastPeaWidth)))return;
   if(type==="procedure" && (!["running","paused"].includes(s.phase) ||
-      !["PEA","Asystole"].includes(s.rhythm) || !PROCEDURE_NAMES[value] ||
-      s.procedures[value]))return;
+      !PROCEDURE_NAMES[value] || s.procedures[value]))return;
   if (type==="rosc" && !["running","paused"].includes(s.phase))return;
   if (type==="reset" && s.phase==="standby")return;
   if (["shock","epi","rhythm","peaWidth","etTube"].includes(type) && !["running","paused"].includes(s.phase))return;
   if(type==="shock"){
-    if(pendingShock || s.phase!=="paused" || s.shockFlow!=="readyShock" ||
+    if(pendingShock || !["running","paused"].includes(s.phase) ||
+      !["decision","charging","readyShock"].includes(s.shockFlow) ||
       !SHOCKABLE_RHYTHMS.has(s.rhythm) ||
       s.lastRhythmEventId===null ||
       s.lastRhythmEventId===s.lastShockRhythmEventId ||
@@ -1371,6 +1374,11 @@ async function handleAction(type,value) {
   try {
     await transmit("cpr-event",e);
     acceptEvent(e,true); // TV only speaks; controller stays silent.
+    if(type==="peaWidth"){
+      causeToolsOpen=true;
+      causeTab="pocus";
+      render();
+    }
   } catch(err) {
     alert("ส่งคำสั่งไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ: "+err.message);
     status("offline");
@@ -1738,8 +1746,7 @@ if(!tvMode){
   });
   document.getElementById("causeToolsToggle").addEventListener("click",()=>{
     const s=computeState();
-    if(!connected||!["running","paused"].includes(s.phase)||
-      !["PEA","Asystole"].includes(s.rhythm))return;
+    if(!connected||!["running","paused"].includes(s.phase))return;
     causeToolsOpen=!causeToolsOpen;
     render();
   });
