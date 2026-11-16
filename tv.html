@@ -19,7 +19,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.7</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v1.8</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -88,8 +88,12 @@
               <div id="peaFunctionRow" class="rhythm-us-row" hidden><span>PEA FUNCTION</span><strong id="peaFunctionValue"></strong></div>
               <div id="positiveUsgRow" class="rhythm-us-row" hidden><span>POSITIVE USG</span><strong id="positiveUsgValue"></strong></div>
             </div>
+            <div id="rhythmMedLabSummary" class="rhythm-record-summary" hidden>
+              <div id="rhythmOtherMedsRow" class="rhythm-record-row" hidden><span>OTHER MEDS</span><strong id="rhythmOtherMedsValue"></strong></div>
+              <div id="rhythmLabsRow" class="rhythm-record-row" hidden><span>LAB CHECKED</span><strong id="rhythmLabsValue"></strong></div>
             </div>
-            <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER</span><strong data-bind="epiTime">00:00</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
+            </div>
+            <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER</span><strong data-bind="epiDisplay">NO NEED</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
             <div class="stat etco2-stat" id="co2Stat">
               <div class="co2-layout">
                 <div class="co2-reading">
@@ -216,7 +220,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V1.7 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V1.8 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
