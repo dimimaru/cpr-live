@@ -58,11 +58,13 @@
         </div>
         <div class="monitor-main">
           <div class="timer-stack">
+            <div class="timer-clock-content">
             <div class="subheading">CPR CYCLE • COUNTDOWN (2 MIN)</div>
             <div class="clock" data-bind="cycle">02:00</div>
             <div class="small-display">TOTAL CASE TIME <span data-bind="elapsed">00:00</span></div>
             <div class="episode-display">ARREST EPISODE <strong data-bind="episode">0</strong></div>
-            <div class="tv-clock-footer" aria-label="Documented CPR hands-off and cumulative chest compression fraction">
+            </div>
+            <div class="tv-clock-footer" aria-label="Logged CPR hands-off and cumulative chest compression fraction">
               <div><span>HANDS-OFF NOW</span><strong data-bind="pauseCurrent">0.0 s</strong></div>
               <div><span>HANDS-OFF TOTAL</span><strong data-bind="pauseTotal">00:00</strong></div>
               <div><span>CCF · ALL EPISODES</span><strong data-bind="ccf">—</strong></div>
@@ -71,7 +73,11 @@
           <div class="stats">
             <div class="stat shock-count-stat"><span>SHOCK</span><strong data-bind="shock">0</strong></div>
             <div class="stat drug-stack">
-              <div class="drug-half" id="epiCountHalf"><span>EPINEPHRINE</span><strong data-bind="epi">0</strong></div>
+              <div class="drug-half epi-count-half" id="epiCountHalf">
+                <span>EPINEPHRINE</span>
+                <div class="epi-tile-values"><strong data-bind="epi">0</strong><strong class="epi-tile-timer" data-bind="epiDisplay">NO NEED</strong></div>
+                <small class="epi-tile-hint" data-bind="epiReminder">NOT YET INDICATED</small>
+              </div>
               <div class="drug-half amio-half"><span>AMIODARONE</span>
                 <div class="amio-dose-row"><span id="amio300Badge">300 mg</span><span id="amio150Badge">150 mg</span></div>
               </div>
@@ -92,12 +98,15 @@
               <div id="peaFunctionRow" class="rhythm-us-row" hidden><span>PEA FUNCTION</span><strong id="peaFunctionValue"></strong></div>
               <div id="positiveUsgRow" class="rhythm-us-row" hidden><span>POSITIVE USG</span><strong id="positiveUsgValue"></strong></div>
             </div>
-            <div id="rhythmMedLabSummary" class="rhythm-record-summary" hidden>
-              <div id="rhythmOtherMedsRow" class="rhythm-record-row" hidden><span>OTHER MEDS</span><strong id="rhythmOtherMedsValue"></strong></div>
-              <div id="rhythmLabsRow" class="rhythm-record-row" hidden><span>LAB CHECKED</span><strong id="rhythmLabsValue"></strong></div>
+
             </div>
+            <div class="stat timer-stat lab-med-stat" id="labMedStat">
+              <span>LAB / MED</span>
+              <div id="rhythmMedLabSummary" class="rhythm-record-summary">
+                <div id="rhythmOtherMedsRow" class="rhythm-record-row"><span>MEDICATIONS</span><strong id="rhythmOtherMedsValue">—</strong></div>
+                <div id="rhythmLabsRow" class="rhythm-record-row"><span>LAB CHECKED</span><strong id="rhythmLabsValue">—</strong></div>
+              </div>
             </div>
-            <div class="stat timer-stat" id="epiStat"><span id="epiReminderTitle">EPINEPHRINE TIMER</span><strong data-bind="epiDisplay">NO NEED</strong><small data-bind="epiReminder">รอเริ่ม CPR</small></div>
             <div class="stat etco2-stat" id="co2Stat">
               <div class="co2-layout">
                 <div class="co2-reading">
@@ -144,6 +153,42 @@
           <span id="connectionHint">เปิดหน้าเว็บค้างไว้เพื่อรอการเชื่อมต่อ</span>
           <span>SIMULATION ONLY · NO PATIENT DATA</span>
         </div>
+      </section>
+
+      <section id="tvReportDashboard" class="tv-report-dashboard" hidden aria-label="ROSC summary dashboard">
+        <div class="tv-dash-heading"><div><span>CPR LIVE · ROSC</span><strong>CASE DASHBOARD</strong></div><span>RECORDED CPR DATA · ESTIMATED CCF</span></div>
+        <div class="tv-dash-kpis">
+          <div><span>ARREST EPISODES</span><strong id="tvDashEpisodes">0</strong></div>
+          <div><span>SHOCKS</span><strong id="tvDashShock">0</strong></div>
+          <div><span>EPINEPHRINE</span><strong id="tvDashEpi">0</strong></div>
+          <div><span>AMIODARONE</span><strong id="tvDashAmio">—</strong></div>
+        </div>
+        <div class="tv-dash-body">
+          <div class="tv-dash-panel tv-dash-time">
+            <h3>CPR PERFORMANCE</h3>
+            <div class="tv-dash-ccf" id="tvDashCcfRing"><div><strong id="tvDashCcf">—</strong><span>CCF · LOGGED PAUSES</span></div></div>
+            <div class="tv-dash-time-rows">
+              <div><span>TOTAL CASE</span><strong id="tvDashCaseTime">00:00</strong></div>
+              <div><span>TOTAL ARREST</span><strong id="tvDashCprTime">00:00</strong></div>
+              <div><span>HANDS-OFF</span><strong id="tvDashPauseTime">00:00</strong></div>
+            </div>
+          </div>
+          <div class="tv-dash-panel tv-dash-rhythms">
+            <h3>RECORDED RHYTHMS</h3>
+            <div class="tv-dash-bar-row"><span>VF</span><div><i data-tv-dash-bar="VF"></i></div><b data-tv-dash-count="VF">0</b></div>
+            <div class="tv-dash-bar-row"><span>pVT</span><div><i data-tv-dash-bar="VT"></i></div><b data-tv-dash-count="VT">0</b></div>
+            <div class="tv-dash-bar-row"><span>PEA</span><div><i data-tv-dash-bar="PEA"></i></div><b data-tv-dash-count="PEA">0</b></div>
+            <div class="tv-dash-bar-row"><span>Asystole</span><div><i data-tv-dash-bar="Asystole"></i></div><b data-tv-dash-count="Asystole">0</b></div>
+          </div>
+          <div class="tv-dash-panel tv-dash-records">
+            <h3>MEDICATIONS · LABS · INTERVENTIONS</h3>
+            <div class="tv-dash-record-group"><span>MEDICATIONS</span><strong id="tvDashMeds">—</strong></div>
+            <div class="tv-dash-record-group"><span>LAB CHECKED</span><strong id="tvDashLabs">—</strong></div>
+            <div class="tv-dash-record-group"><span>POCUS POSITIVE</span><strong id="tvDashPocus">—</strong></div>
+            <div class="tv-dash-record-group"><span>PROCEDURES</span><strong id="tvDashProcedures">—</strong></div>
+          </div>
+        </div>
+        <div class="tv-dash-foot">Tap RE-ARREST · START CPR on the Remote to return to the live monitor automatically. · Prototype recording, not verified patient data.</div>
       </section>
 
       <section id="controllerPanel" class="controller" aria-label="CPR remote controller">
