@@ -29,7 +29,7 @@ if(tvMode){
   document.title="CPR Live Monitor";
 }
 const DEVICE_ID = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + "-" + Math.random();
-const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2","charge","clear","adjunct","finding","procedure","display"]);
+const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2","charge","clear","adjunct","finding","procedure","display","leadWait"]);
 const TWO_MIN = 120000;
 const FOUR_MIN = 240000;
 const SHOCK_COOLDOWN_MS = 100000; // 1 min 40 seconds for duplicate SHOCK logs
@@ -148,6 +148,7 @@ function blankState() {
     pauseId:null,
     pauseReason:null,
     pauseRhythmRecorded:false,
+    ecgPending:false, // ECG leads not yet ready; CPR continues until next rhythm check.
     pauseAccruedMs:0,
     arrestAccruedMs:0,
     episodeStartAt:null,
@@ -191,15 +192,16 @@ function computeState() {
       }
       s.episode++;
       s.tvDashboard=false; // Re-arrest immediately restores every TV monitor.
-      s.phase="running";
+      s.phase="paused"; // Initial rhythm assessment counts as hands-off until Resume/Wait ECG.
       s.cycleAnchor=t;
       s.episodeStartAt=t;
       s.coachAnchor=t;
       s.frozenCycleMs=0;
-      s.pausedAt=null;
-      s.pauseId=null;
-      s.pauseReason=null;
+      s.pausedAt=t;
+      s.pauseId=e.id;
+      s.pauseReason="rhythm";
       s.pauseRhythmRecorded=false;
+      s.ecgPending=false;
       s.rhythm="—";
       s.lastRhythmEventId=null;
       s.lastShockRhythmEventId=null;
@@ -218,10 +220,25 @@ function computeState() {
       // Compression interruption does NOT stop the 2-min cycle or epinephrine clock.
       s.pausedAt=t;
       s.pauseId=e.id;
-      s.pauseReason=e.value==="cycle"?"cycle":"manual";
+      s.pauseReason=e.value==="cycle"?"cycle":"rhythm";
       s.pauseRhythmRecorded=false;
+      s.ecgPending=false;
       s.phase="paused";
-      line(s,e,s.pauseReason==="cycle"?"2-MIN CYCLE — PAUSE FOR RHYTHM":"PAUSE CHEST COMPRESSIONS");
+      line(s,e,s.pauseReason==="cycle"?"2-MIN CYCLE — PAUSE FOR RHYTHM":"PAUSE CPR — RHYTHM ASSESSMENT");
+    } else if (e.type === "leadWait" && s.phase==="paused" &&
+      ["cycle","rhythm"].includes(s.pauseReason) && !s.pauseRhythmRecorded && !s.shockFlow) {
+      // Continue compressions while ECG leads are being attached. The rhythm
+      // stays unknown (or the previous confirmed rhythm) until re-assessment.
+      s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
+      s.pausedAt=null;
+      s.pauseId=null;
+      s.pauseReason=null;
+      s.pauseRhythmRecorded=false;
+      s.phase="running";
+      s.ecgPending=true;
+      s.cycleAnchor=t;
+      s.coachAnchor=t;
+      line(s,e,"CONTINUE CPR — ECG LEADS NOT READY; CHECK RHYTHM LATER");
     } else if (e.type === "charge" &&
       s.shockFlow==="decision" && ["running","paused"].includes(s.phase)) {
       // Compression continues during charging. Close any earlier rhythm-check pause.
@@ -252,10 +269,10 @@ function computeState() {
       line(s,e,"CLEAR — CHARGE READY / HANDS OFF");
     } else if (e.type === "resume" && s.phase === "paused") {
       if(s.shockFlow && s.shockFlow!=="postShock")continue;
-      if(s.pauseReason==="cycle" && !s.pauseRhythmRecorded)continue;
+      if(["cycle","rhythm"].includes(s.pauseReason) && !s.pauseRhythmRecorded)continue;
       const interruption=Math.max(0,t-s.pausedAt);
       s.pauseAccruedMs+=interruption;
-      if(s.pauseReason==="cycle" || s.shockFlow==="postShock"){
+      if(["cycle","rhythm"].includes(s.pauseReason) || s.shockFlow==="postShock"){
         s.cycleAnchor=t; // Next two-minute cycle begins only after Resume.
       }
       s.pausedAt=null;
@@ -325,13 +342,22 @@ function computeState() {
       line(s,e,"AMIODARONE "+e.value+" mg");
     } else if (["running","paused"].includes(s.phase) && e.type === "rhythm" &&
       ["VF","VT","PEA","Asystole"].includes(e.value)) {
+      // Old remotes can still broadcast a rhythm without first pressing Pause.
+      // Treat the record as the beginning of an interruption until Resume CPR.
+      if(s.phase==="running"){
+        s.phase="paused";
+        s.pausedAt=t;
+        s.pauseId=e.id;
+        s.pauseReason="rhythm";
+      }
       s.rhythm=e.value;
+      s.ecgPending=false;
       if(e.value==="PEA" || e.value==="Asystole"){
         s.fromNonShockable=true;
         if(s.firstNonshockAt===null)s.firstNonshockAt=t;
       }
       s.lastRhythmEventId=e.id;
-      if(s.phase==="paused" && s.pauseReason==="cycle")s.pauseRhythmRecorded=true;
+      if(s.phase==="paused" && ["cycle","rhythm"].includes(s.pauseReason))s.pauseRhythmRecorded=true;
       if(SHOCKABLE_RHYTHMS.has(e.value)){
         // A new rhythm is required to initiate a fresh Shock workflow.
         if(s.shockFlow===null)s.shockFlow="decision";
@@ -745,7 +771,7 @@ function renderInterruption(s,clock){
   const pauseBanner=document.getElementById("rhythmPauseBanner");
   pauseBanner.hidden=!(tvMode&&paused);
   if(tvMode&&paused){
-    const cyclePause=s.pauseReason==="cycle";
+    const cyclePause=["cycle","rhythm"].includes(s.pauseReason);
     document.getElementById("tvRhythmPauseMessage").textContent=
       s.shockFlow==="readyShock"?"CLEAR — SHOCK":
       s.shockFlow==="postShock"?"SHOCK RECORDED — RESUME CPR":
@@ -920,8 +946,7 @@ function nextMedication(s,clock){
 }
 function roscSelectionAvailable(s){
   return ["running","paused"].includes(s.phase) && !s.shockFlow &&
-    (s.rhythm==="—" ||
-      (s.phase==="paused" && s.pauseReason==="cycle" && !s.pauseRhythmRecorded));
+    s.phase==="paused" && ["cycle","rhythm"].includes(s.pauseReason) && !s.pauseRhythmRecorded;
 }
 function renderCauseTools(s){
   if(tvMode)return;
@@ -1070,8 +1095,8 @@ function renderTvReportDashboard(s,clock){
 function renderControllerStage(s) {
   if(tvMode)return;
   if(roscReviewOpen && !roscSelectionAvailable(s))roscReviewOpen=false;
-  const cyclePaused=s.phase==="paused" && s.pauseReason==="cycle";
-  const choosing=["running","paused"].includes(s.phase) && s.rhythm==="—";
+  const rhythmAssessment=s.phase==="paused" && ["cycle","rhythm"].includes(s.pauseReason);
+  const choosing=["running","paused"].includes(s.phase) && s.rhythm==="—" && !s.ecgPending;
   const flow=s.shockFlow;
   if(s.phase==="rosc" || s.phase==="standby")roscReviewOpen=false;
   const stage=s.phase==="rosc"?(s.tvDashboard?"dashboard":"reArrest"):
@@ -1081,7 +1106,7 @@ function renderControllerStage(s) {
     flow==="charging"?"charging":
     flow==="readyShock"?"shock":
     flow==="postShock"?"resume":
-    cyclePaused?(s.pauseRhythmRecorded?"resume":"rhythm"):
+    rhythmAssessment?(s.pauseRhythmRecorded?"resume":"rhythm"):
     choosing?"rhythm":"normal";
   for(const item of ["start","rhythm","normal","resume","decision","charging","shock","roscReview","reArrest","dashboard"]){
     document.body.classList.toggle("remote-stage-"+item,stage===item);
@@ -1107,10 +1132,10 @@ function renderControllerStage(s) {
   document.getElementById("stageReArrestBtn").disabled=
     !connected || stage!=="reArrest" || pendingActions.has("start") ||
     actionCooldownRemaining(s,"start",Date.now())>0;
-  document.getElementById("stageRhythmHeading").textContent=cyclePaused?
-    "IDENTIFY RHYTHM":"SELECT RHYTHM";
-  document.getElementById("stageRhythmClock").textContent=cyclePaused?
-    "CPR PAUSED • SELECT RHYTHM":"CPR TIMER IS RUNNING";
+  document.getElementById("stageRhythmHeading").textContent="IDENTIFY RHYTHM";
+  document.getElementById("stageRhythmClock").textContent="HANDS-OFF • SELECT RHYTHM";
+  document.getElementById("stageWaitEcgBtn").disabled=!connected || stage!=="rhythm" ||
+    s.phase!=="paused" || pendingActions.has("leadWait");
   const clearTimer=["readyShock","postShock"].includes(flow);
   const clockBase=clearTimer?s.clearAt:s.pausedAt;
   const clearMs=clearTimer&&clockBase!==null?Math.max(0,Date.now()-clockBase):0;
@@ -1129,7 +1154,7 @@ function renderControllerStage(s) {
   const resumeButton=document.getElementById("stageResumeBtn");
   resumeButton.classList.toggle("critical",countdown>=3000);
   resumeButton.disabled=!connected || s.phase!=="paused" ||
-    (flow?flow!=="postShock":!cyclePaused || !s.pauseRhythmRecorded) ||
+    (flow?flow!=="postShock":!rhythmAssessment || !s.pauseRhythmRecorded) ||
     pendingActions.has("resume") || actionCooldownRemaining(s,"resume",Date.now())>0;
   document.getElementById("shockButton").classList.toggle("critical",clearMs>=3000);
   document.getElementById("shockButtonDirect").classList.toggle("critical",pauseMs>=3000);
@@ -1183,7 +1208,7 @@ function render() {
     epiReminder:s.lastEpiAt===null?(firstDoseStatus?.hint||"NOT YET INDICATED"):
       clock.epiMs>=280000?"EPINEPHRINE DUE SOON / DUE":
       clock.epiMs>=240000?"4 MIN • READY":"SINCE LAST DOSE",
-    shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm==="VT"?"pVT":s.rhythm,etco2:s.etco2===null?"—":s.etco2,
+    shock:s.shock,epi:s.epi,rhythm:s.ecgPending&&s.rhythm==="—"?"ECG LEADS PENDING":s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm==="VT"?"pVT":s.rhythm,etco2:s.etco2===null?"—":s.etco2,
     episode:s.episode,ccf:clock.ccf===null?"—":clock.ccf.toFixed(1)+"%",
     pauseCurrent:s.phase==="rosc" || s.phase==="standby"?"—":(clock.currentPauseMs/1000).toFixed(1)+" s",
     pauseTotal:timeText(clock.pauseMs),room
@@ -1278,7 +1303,7 @@ function render() {
   const pauseResume=document.getElementById("pauseResumeBtn");
   const resume=s.phase==="paused";
   pauseResume.dataset.action=resume?"resume":"pause";
-  pauseResume.textContent=resume?"▶ RESUME CPR":"Ⅱ PAUSE CPR";
+  pauseResume.textContent=resume?"▶ RESUME CPR":"Ⅱ PAUSE CPR · CHECK RHYTHM";
   pauseResume.classList.toggle("resume-flash",resume);
   pauseResume.disabled=!connected || !!s.shockFlow ||
     !["running","paused"].includes(s.phase) ||
@@ -1360,7 +1385,7 @@ function render() {
   checkAlarms(s,clock);
   // Only the active Controller initiates an automatic log entry at the end of
   // the 2-minute cycle. Re-check phase and network guard inside handleAction.
-  if(!tvMode && connected && s.phase==="running" && s.rhythm!=="—" &&
+  if(!tvMode && connected && s.phase==="running" && (s.rhythm!=="—" || s.ecgPending) &&
      !s.shockFlow && clock.cycleMs>=TWO_MIN && !pendingActions.has("pause")){
     void handleAction("pause","cycle");
   }
@@ -1420,8 +1445,10 @@ async function handleAction(type,value) {
   if (type==="start" && !["standby","rosc"].includes(s.phase))return;
   if (type==="display" && (s.phase!=="rosc" || !["dashboard","monitor"].includes(value)))return;
   if (type==="pause" && s.phase!=="running")return;
+  if (type==="leadWait" && !(s.phase==="paused" &&
+      ["cycle","rhythm"].includes(s.pauseReason) && !s.pauseRhythmRecorded && !s.shockFlow))return;
   if (type==="resume" && s.phase!=="paused")return;
-  if(type==="resume" && s.pauseReason==="cycle" && !s.pauseRhythmRecorded)return;
+  if(type==="resume" && ["cycle","rhythm"].includes(s.pauseReason) && !s.pauseRhythmRecorded)return;
   if(type==="resume" && s.shockFlow && s.shockFlow!=="postShock")return;
   if(type==="charge" && s.shockFlow!=="decision")return;
   if(type==="clear" && !["decision","charging"].includes(s.shockFlow))return;
