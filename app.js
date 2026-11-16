@@ -809,6 +809,42 @@ function rhythmUltrasoundSummary(s){
   return {functionText,positives:relevant?
     ultrasoundKeys.filter(([key])=>!!s.findings[key]).map(([,label])=>label):[]};
 }
+function recordedMedLabSummary(s){
+  const meds=[];
+  const counts=s.adjunctCounts||{};
+  const bicarb=(counts.nahco3||0)+(counts.nahco3_1||0)+2*(counts.nahco3_2||0);
+  if(bicarb)meds.push("NaHCO₃ "+bicarb+" amp");
+  if(counts.calcium)meds.push("Calcium ×"+counts.calcium);
+  if(counts.glucose)meds.push("Dextrose 50% ×"+counts.glucose);
+  if(counts.lidocaine)meds.push("Lidocaine ×"+counts.lidocaine);
+  if(counts.prc)meds.push("PRC "+counts.prc+" unit");
+  const labs=new Map();
+  // Checklist marks investigation recorded/reviewed. It does not prove the
+  // lab was ordered, resulted, or normal; avoid falsely labeling it as sent.
+  for(const item of s.timeline){
+    const label=item.label||"";
+    const checked=label.startsWith("CHECKED: ");
+    const unchecked=label.startsWith("UNCHECKED: ");
+    if(!checked&&!unchecked)continue;
+    const raw=label.slice(checked?9:11);
+    if(!raw.startsWith("Lab: ")&&!raw.startsWith("Check: Core temperature"))continue;
+    const name=raw.replace(/^Lab: /,"").replace(/^Check: /,"");
+    labs.set(name,checked);
+  }
+  return {meds,labs:[...labs].filter(([,checked])=>checked).map(([name])=>name)};
+}
+function renderRhythmMedLab(s){
+  const panel=document.getElementById("rhythmMedLabSummary");
+  if(!panel)return;
+  const meds=document.getElementById("rhythmOtherMedsRow");
+  const labs=document.getElementById("rhythmLabsRow");
+  const data=recordedMedLabSummary(s);
+  meds.hidden=!data.meds.length;
+  labs.hidden=!data.labs.length;
+  panel.hidden=!data.meds.length&&!data.labs.length;
+  if(data.meds.length)document.getElementById("rhythmOtherMedsValue").textContent=data.meds.join(" · ");
+  if(data.labs.length)document.getElementById("rhythmLabsValue").textContent=data.labs.join(" · ");
+}
 function renderRhythmUltrasound(s){
   const area=document.getElementById("rhythmUsSummary");
   if(!area)return;
@@ -1079,13 +1115,15 @@ function render() {
   const cycleProgress=s.phase==="standby"?0:clock.cycleMs%TWO_MIN;
   const currentCycle=s.phase==="standby"?TWO_MIN:cycleProgress===0?TWO_MIN:TWO_MIN-cycleProgress;
   const cue=medicationCue(s,clock);
+  const firstDoseStatus=epiBeforeFirstDose(s);
   const values={
     phase:s.phase==="running"?"CPR ACTIVE":s.phase==="paused"?"CPR PAUSED":
       s.phase==="rosc"?"ROSC — MONITORING":"STANDBY",
     cycle:timeText(currentCycle),
     elapsed:timeText(clock.totalMs),
     epiTime:s.lastEpiAt===null?"NO NEED":timeText(clock.epiMs),
-    epiReminder:s.lastEpiAt===null?"FIRST DOSE NOT RECORDED":
+    epiDisplay:s.lastEpiAt===null?(firstDoseStatus?.display||"NO NEED"):timeText(clock.epiMs),
+    epiReminder:s.lastEpiAt===null?(firstDoseStatus?.hint||"NOT YET INDICATED"):
       clock.epiMs>=280000?"EPINEPHRINE DUE SOON / DUE":
       clock.epiMs>=240000?"4 MIN • READY":"SINCE LAST DOSE",
     shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm==="VT"?"pVT":s.rhythm,etco2:s.etco2===null?"—":s.etco2,
@@ -1215,7 +1253,9 @@ function render() {
   const epiHint=document.getElementById("epiLockHint");
   epiHint.hidden=true;
   epiButton.classList.toggle("epi-locked",epiLocked);
-  epiButton.textContent="❤️ EPINEPHRINE";
+  epiButton.textContent=s.lastEpiAt===null&&s.fromNonShockable?
+    "❤️ SUGGEST ADRENALINE":s.lastEpiAt===null&&s.shock>=2?
+    "❤️ CONSIDER ADRENALINE":"❤️ EPINEPHRINE";
   const amio=amiodaroneStatus(s);
   amioButton.textContent=medication==="prepare"?
     "💉 เตรียม AMIODARONE "+amio.dose+" mg":
@@ -1257,6 +1297,7 @@ function render() {
   renderVentilation(s,clock);
   renderECG(s);
   renderRhythmUltrasound(s);
+  renderRhythmMedLab(s);
   renderEtco2Prompt(s);
   renderInterruption(s,clock);
   checkAlarms(s,clock);
