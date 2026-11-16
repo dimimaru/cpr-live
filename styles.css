@@ -1689,3 +1689,217 @@ body.tv-mode .tv-clock-footer>div:last-child strong{color:#62deba}
   body.tv-mode .tv-clock-footer span{font-size:clamp(7px,.65vw,10px)}
   body.tv-mode .tv-clock-footer strong{font-size:clamp(11px,1.05vw,16px)}
 }
+
+
+/* V2.0 — TV fixes: reserve an actual footer row in the left CPR clock column.
+   All three metrics remain visible while compression timing is active. */
+body.tv-mode .timer-stack{
+  display:flex;flex-direction:column;
+  align-items:stretch;justify-content:space-between;
+  position:relative;min-height:0;min-width:0;
+  overflow:visible;padding-bottom:0;
+  gap:2px;
+}
+body.tv-mode .timer-clock-content{
+  flex:1 1 auto;min-height:0;min-width:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:clamp(2px,.45vh,6px);
+  overflow:hidden;
+}
+body.tv-mode .timer-clock-content .subheading{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+body.tv-mode .timer-clock-content .clock{
+  font-size:clamp(52px, min(9vw,19vh), 167px);
+  max-width:100%;flex:0 1 auto;
+}
+body.tv-mode .timer-stack .tv-clock-footer{
+  position:static;inset:auto;left:auto;bottom:auto;right:auto;
+  flex:0 0 auto;display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  align-items:center;
+  width:100%;max-width:100%;
+  min-height:clamp(35px,5.5vh,54px);
+  padding:4px clamp(2px,.6vw,8px);
+  gap:clamp(2px,.5vw,8px);
+  overflow:hidden;
+  border:1px solid #34516f;border-radius:7px;
+  background:#102339;
+}
+body.tv-mode .timer-stack .tv-clock-footer>div{display:flex;min-width:0;gap:2px}
+body.tv-mode .timer-stack .tv-clock-footer span{
+  font-size:clamp(7px,.67vw,11px);line-height:1.1;
+  white-space:normal;overflow-wrap:anywhere;
+}
+body.tv-mode .timer-stack .tv-clock-footer strong{
+  font-size:clamp(11px,1.2vw,20px);
+  white-space:nowrap;line-height:1.1;
+}
+/* Epi counter + countdown coexist in the top half of the dose tile. */
+body.tv-mode .stats>.stat.drug-stack .epi-count-half{
+  display:flex;flex-direction:column;justify-content:space-evenly;
+  align-items:center;gap:1px;padding:2px 3px;overflow:hidden;
+}
+body.tv-mode .epi-count-half>span{color:#a5c2dc;font-size:clamp(8px,.7vw,11px)}
+body.tv-mode .epi-count-half .epi-tile-values{
+  display:flex;align-items:baseline;justify-content:center;
+  flex-wrap:wrap;gap:clamp(3px,.6vw,13px);width:100%;min-width:0;
+}
+body.tv-mode .epi-tile-values>strong:first-child{
+  font-size:clamp(17px,1.7vw,31px)!important;
+  color:#f6fbff;line-height:1;font-variant-numeric:tabular-nums;
+}
+body.tv-mode .epi-tile-values .epi-tile-timer{
+  font-size:clamp(10px,1.12vw,21px)!important;
+  color:#d6f3ff;line-height:1.05;
+  white-space:normal;overflow-wrap:anywhere;text-align:center;
+}
+body.tv-mode .epi-count-half .epi-tile-hint{
+  font-size:clamp(7px,.61vw,10px);line-height:1.1;
+  font-weight:750;color:#a7c7d7;
+  text-align:center;max-width:100%;overflow:hidden;
+}
+body.tv-mode .epi-count-half.epi-green{background:#11533e}
+body.tv-mode .epi-count-half.epi-urgent{background:#a01e38!important;color:#fff}
+body.tv-mode .epi-count-half.epi-urgent .epi-tile-timer,
+body.tv-mode .epi-count-half.epi-urgent .epi-tile-hint{color:#fff}
+body.tv-mode .stats>.stat.lab-med-stat{
+  grid-column:span 3;
+  display:flex;flex-direction:column;align-items:stretch;
+  justify-content:flex-start;gap:4px;overflow:hidden;
+}
+body.tv-mode .lab-med-stat>span{
+  flex:0 0 auto;font-size:clamp(11px,.98vw,16px);
+  font-weight:900;color:#cce8ff;
+}
+body.tv-mode .lab-med-stat .rhythm-record-summary{
+  display:grid!important;grid-template-rows:repeat(2,minmax(0,1fr));
+  gap:3px;min-height:0;min-width:0;flex:1;
+  width:100%;overflow:hidden;
+}
+body.tv-mode .lab-med-stat .rhythm-record-row{
+  display:flex!important;flex-direction:column;
+  justify-content:flex-start;
+  gap:3px;min-width:0;min-height:0;
+  border-top:1px solid #36516d;padding:5px 1px 2px;
+  overflow-y:auto;overflow-x:hidden;
+}
+body.tv-mode .lab-med-stat .rhythm-record-row>span{
+  font-size:clamp(9px,.83vw,13px);
+  color:#9fc8e0;font-weight:900;
+}
+body.tv-mode .lab-med-stat .rhythm-record-row>strong{
+  font-size:clamp(11px,1.03vw,17px);
+  line-height:1.23;overflow-wrap:anywhere;
+  color:#f2f9ff;font-weight:800;
+}
+body.tv-mode .stats>.stat.rhythm-stat .rhythm-record-summary{display:none!important}
+
+/* ROSC Dashboard replaces the monitor only when requested on the Remote. */
+body.tv-mode.tv-dashboard-active .monitor{display:none!important}
+body.tv-mode .tv-report-dashboard[hidden]{display:none!important}
+body.tv-mode .tv-report-dashboard{
+  flex:1 1 auto;min-width:0;min-height:0;
+  display:flex;flex-direction:column;
+  gap:clamp(7px,1vh,16px);
+  padding:clamp(10px,1.4vw,22px);
+  border:1px solid #345779;border-radius:10px;
+  background:linear-gradient(145deg,#102740,#091724);
+  overflow:hidden;
+}
+body.tv-mode .tv-dash-heading{
+  flex:0 0 auto;min-width:0;
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+}
+body.tv-mode .tv-dash-heading>div{display:flex;flex-direction:column;gap:3px}
+body.tv-mode .tv-dash-heading>div>span{font-size:clamp(11px,1.05vw,16px);font-weight:900;color:#58ebbc;letter-spacing:.12em}
+body.tv-mode .tv-dash-heading strong{font-size:clamp(23px,2.9vw,49px);line-height:1.05;color:#f3fbff}
+body.tv-mode .tv-dash-heading>span{font-size:clamp(9px,.9vw,14px);font-weight:800;color:#8dacbf;text-align:right}
+body.tv-mode .tv-dash-kpis{
+  flex:0 0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(6px,.8vw,14px);
+}
+body.tv-mode .tv-dash-kpis>div{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;min-width:0;
+  padding:clamp(7px,.9vw,14px) 5px;
+  background:#183a57;border:1px solid #356485;border-radius:12px;
+}
+body.tv-mode .tv-dash-kpis>div>span{font-size:clamp(9px,.85vw,14px);font-weight:850;color:#b9d6ec;text-align:center}
+body.tv-mode .tv-dash-kpis>div>strong{font-size:clamp(26px,3vw,52px);line-height:1.05;color:#fff;text-align:center}
+body.tv-mode .tv-dash-body{
+  flex:1 1 auto;min-height:0;min-width:0;
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.95fr) minmax(0,1.22fr);
+  gap:clamp(7px,.85vw,14px);
+}
+body.tv-mode .tv-dash-panel{
+  min-height:0;min-width:0;overflow:hidden;
+  display:flex;flex-direction:column;
+  gap:clamp(7px,.8vw,12px);
+  padding:clamp(10px,1vw,17px);
+  border-radius:12px;border:1px solid #3c5b78;background:#132c43;
+}
+body.tv-mode .tv-dash-panel h3{margin:0;font-size:clamp(11px,1vw,17px);color:#a6dbe6;letter-spacing:.04em}
+body.tv-mode .tv-dash-time{align-items:stretch}
+body.tv-mode .tv-dash-ccf{
+  width:min(13vw,22vh,165px);height:min(13vw,22vh,165px);
+  min-width:83px;min-height:83px;
+  align-self:center;flex:0 0 auto;
+  display:grid;place-items:center;border-radius:50%;
+  background:conic-gradient(#20ba94 0% 0%,#cc5369 0% 100%);
+}
+body.tv-mode .tv-dash-ccf>div{
+  width:80%;height:80%;border-radius:50%;
+  background:#132c43;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;
+}
+body.tv-mode .tv-dash-ccf strong{font-size:clamp(17px,2.1vw,38px);color:#fff}
+body.tv-mode .tv-dash-ccf span{font-size:clamp(7px,.63vw,10px);color:#add5ce;text-align:center}
+body.tv-mode .tv-dash-time-rows{display:grid;grid-template-columns:1fr;gap:6px;min-height:0}
+body.tv-mode .tv-dash-time-rows>div{display:flex;justify-content:space-between;gap:4px;border-bottom:1px solid #385067}
+body.tv-mode .tv-dash-time-rows span{font-size:clamp(10px,.9vw,14px);font-weight:850;color:#9fc6df}
+body.tv-mode .tv-dash-time-rows strong{font-size:clamp(13px,1.35vw,22px);color:#fff;font-variant-numeric:tabular-nums}
+body.tv-mode .tv-dash-bar-row{
+  flex:1 1 auto;min-height:0;
+  display:grid;grid-template-columns:68px minmax(0,1fr) 26px;
+  align-items:center;gap:8px;color:#e6f4ff;font-weight:900;
+  font-size:clamp(12px,1.1vw,19px);
+}
+body.tv-mode .tv-dash-bar-row>div{
+  background:#224056;height:clamp(15px,2.1vh,28px);
+  border-radius:10px;overflow:hidden;
+}
+body.tv-mode .tv-dash-bar-row i{display:block;width:0;height:100%;background:#61c4b4;border-radius:10px}
+body.tv-mode .tv-dash-bar-row:nth-of-type(1) i{background:#e2696b}
+body.tv-mode .tv-dash-bar-row:nth-of-type(2) i{background:#e29f55}
+body.tv-mode .tv-dash-bar-row:nth-of-type(3) i{background:#58afcc}
+body.tv-mode .tv-dash-bar-row:nth-of-type(4) i{background:#9d85dc}
+body.tv-mode .tv-dash-bar-row b{text-align:right}
+body.tv-mode .tv-dash-records{overflow-y:auto}
+body.tv-mode .tv-dash-record-group{
+  min-width:0;display:flex;flex-direction:column;gap:5px;
+  padding:5px 0;border-bottom:1px solid #36516e;
+}
+body.tv-mode .tv-dash-record-group>span{font-size:clamp(10px,.85vw,14px);font-weight:900;color:#8bdaed}
+body.tv-mode .tv-dash-record-group>strong{font-size:clamp(12px,1.05vw,17px);line-height:1.3;overflow-wrap:anywhere;color:#e5f4ff}
+body.tv-mode .tv-dash-foot{
+  flex:0 0 auto;font-size:clamp(9px,.75vw,12px);
+  color:#87a8be;line-height:1.3;
+}
+/* Short 16:9 screens retain the footer and use a compact landscape dashboard. */
+@media(max-height:650px) and (min-aspect-ratio:1/1){
+  body.tv-mode .timer-clock-content .clock{font-size:clamp(42px,min(8.1vw,17vh),114px)}
+  body.tv-mode .timer-stack .tv-clock-footer{min-height:33px;padding:2px 3px}
+  body.tv-mode .tv-report-dashboard{padding:7px;gap:5px}
+  body.tv-mode .tv-dash-kpis>div{padding:5px;gap:2px}
+  body.tv-mode .tv-dash-panel{padding:6px;gap:4px}
+  body.tv-mode .tv-dash-ccf{width:min(9vw,18vh,95px);height:min(9vw,18vh,95px);min-width:66px;min-height:66px}
+  body.tv-mode .tv-dash-time-rows{gap:2px}
+  body.tv-mode .tv-dash-bar-row{grid-template-columns:55px minmax(0,1fr) 20px}
+}
+@media(max-aspect-ratio:1/1){
+  body.tv-mode .tv-report-dashboard{min-height:100vh;overflow:visible}
+  body.tv-mode .tv-dash-body{grid-template-columns:1fr;overflow:visible}
+  body.tv-mode .tv-dash-panel{min-height:180px;overflow:visible}
+  body.tv-mode .tv-dash-ccf{width:150px;height:150px}
+  body.tv-mode .tv-dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.tv-mode .tv-dash-time-rows{gap:7px}
+}
