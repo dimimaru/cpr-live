@@ -745,6 +745,8 @@ function exampleEcgPath(rhythm,width){
 }
 function renderECG(s){
   const panel=document.getElementById("ecgPanel");
+  const tile=document.querySelector(".rhythm-stat");
+  if(tile)tile.classList.toggle("ecg-leads-pending",s.ecgPending&&s.rhythm==="—");
   if(!tvMode||s.rhythm==="—"){panel.hidden=true;return;}
   panel.hidden=false;
   const name=s.rhythm==="VT"?"pVT":s.rhythm==="PEA"?
