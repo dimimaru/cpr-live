@@ -1182,13 +1182,15 @@ function timelineWithCycles(entries){
     const text=entry.label||"";
     if(text==="START CPR" || text.startsWith("RE-ARREST — START CPR")){
       episode++;cycle=1;anchor=entry.ts;awaitingNext=false;
-    }else if(text.startsWith("RESUME COMPRESSIONS — ") && awaitingNext){
+    }else if((text.startsWith("RESUME COMPRESSIONS — ") ||
+                text.startsWith("CONTINUE CPR — ECG LEADS NOT READY")) && awaitingNext){
       cycle++;anchor=entry.ts;awaitingNext=false;
     }
     const item={...entry,episode,cycle,cycleAnchor:anchor,
       groupKey:episode+"-"+cycle};
     if(text.startsWith("2-MIN CYCLE — PAUSE FOR RHYTHM") ||
-       /^SHOCK #\d+$/.test(text))awaitingNext=true;
+       text.startsWith("PAUSE CPR — RHYTHM ASSESSMENT") ||
+       text.startsWith("CLEAR FIRST — SHOCK #"))awaitingNext=true;
     if(text.startsWith("ROSC —"))awaitingNext=false;
     return item;
   });
