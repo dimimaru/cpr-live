@@ -1248,6 +1248,7 @@ function render() {
   epiButton.classList.toggle("epi-urgent",epiState==="red" && !epiLocked);
   document.getElementById("epiStat").classList.toggle("due",epiState==="red");
   document.getElementById("epiStat").classList.toggle("epi-green",epiState==="green");
+  document.getElementById("epiStat").classList.toggle("undosed",s.lastEpiAt===null);
   document.getElementById("epiCountHalf").classList.toggle("epi-urgent",epiState==="red");
   document.getElementById("epiCountHalf").classList.toggle("epi-green",epiState==="green");
   const epiHint=document.getElementById("epiLockHint");
