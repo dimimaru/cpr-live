@@ -1,4 +1,4 @@
-// CPR Live v1.7 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v1.8 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -34,6 +34,7 @@ const TWO_MIN = 120000;
 const FOUR_MIN = 240000;
 const SHOCK_COOLDOWN_MS = 100000; // 1 min 40 seconds for duplicate SHOCK logs
 const EPI_COOLDOWN_MS = 180000; // 3 minutes between documented Epi doses
+const FIRST_NONSHOCK_ALERT_MS = 120000; // two-minute reminder from first nonshock rhythm
 const ACTION_COOLDOWN_MS = 5000; // per-button anti-double-tap for other actions
 const FIVE_MIN = 300000;
 const EPI_PREWARN_MS = 20000;
@@ -65,6 +66,20 @@ const FINDING_LABELS={
   "trauma:bleeding":"Trauma: Hemorrhage considered"
 };
 const PROCEDURE_NAMES={icd_lt:"ICD Lt",icd_rt:"ICD Rt"};
+// Narrow vs wide PEA suggests possible investigation priorities, not a diagnosis.
+const QRS_INVESTIGATIONS={
+  "qrs:n:tamponade":"Narrow QRS — evaluated tamponade (POCUS)",
+  "qrs:n:ptx":"Narrow QRS — evaluated tension pneumothorax (US / exam)",
+  "qrs:n:pe":"Narrow QRS — evaluated pulmonary PE (risk / RV / DVT findings)",
+  "qrs:n:volume":"Narrow QRS — evaluated hypovolemia/bleeding (eFAST)",
+  "qrs:n:airway":"Narrow QRS — evaluated dynamic hyperinflation / airway",
+  "qrs:w:potassium":"Wide QRS — checked potassium / blood gas",
+  "qrs:w:acidbase":"Wide QRS — checked severe acid-base disturbance",
+  "qrs:w:tox":"Wide QRS — considered Na-channel blocker toxicity",
+  "qrs:w:temp":"Wide QRS — checked core temperature",
+  "qrs:w:cardiac":"Wide QRS — considered ischemia / pump failure"
+};
+Object.assign(FINDING_LABELS,QRS_INVESTIGATIONS);
 function actionGroup(type,value){ return ["adjunct","finding","procedure"].includes(type)?type+":"+value:type; }
 function actionCooldownRemaining(s,type,now,value){
   // START is gated by standby/ROSC phase, so a rapid re-arrest cannot be
@@ -140,7 +155,7 @@ function blankState() {
     epiAnchor:null,        // Time since CPR start or latest documented epinephrine.
     shock:0,lastShockAt:null,lastEpiAt:null,epi:0,amioDoses:[],
     rhythm:"—",lastRhythmEventId:null,lastShockRhythmEventId:null,
-    fromNonShockable:false,
+    fromNonShockable:false,firstNonshockAt:null,lastPeaWidth:null,
     shockFlow:null, // decision / charging / readyShock / postShock
     clearAt:null,
     adjunctCounts:{},
@@ -188,6 +203,8 @@ function computeState() {
       s.lastRhythmEventId=null;
       s.lastShockRhythmEventId=null;
       s.fromNonShockable=false; // Re-arrest begins a new rhythm pathway.
+      s.firstNonshockAt=null;
+      s.lastPeaWidth=null;
       s.shockFlow=null;
       s.clearAt=null;
       s.peaWidth=null;
@@ -266,15 +283,26 @@ function computeState() {
       // Shared event-source guard: only the earliest shock in each 100s window
       // is counted, even if several controllers broadcast duplicate clicks.
       // This is UI/logging protection, not an electrical defibrillator lockout.
-      if(s.shockFlow==="readyShock" && s.phase==="paused" &&
+      if(["decision","charging","readyShock"].includes(s.shockFlow) &&
         (s.lastShockAt===null || t-s.lastShockAt>=SHOCK_COOLDOWN_MS) &&
         SHOCKABLE_RHYTHMS.has(s.rhythm) && s.lastRhythmEventId!==null &&
         s.lastRhythmEventId!==s.lastShockRhythmEventId){
+        // One recorder tap logs CLEAR FIRST / SHOCK. It does not control a
+        // defibrillator. Compression interruption begins at this tap when
+        // charging CPR was running; an existing rhythm-check pause is retained.
+        if(s.phase==="running"){
+          s.phase="paused";
+          s.pausedAt=t;
+          s.pauseId=e.id;
+        }
+        s.pauseReason="shock";
+        s.pauseRhythmRecorded=true;
+        if(s.clearAt===null)s.clearAt=t;
         s.shock++;
         s.lastShockAt=t;
         s.lastShockRhythmEventId=s.lastRhythmEventId;
         s.shockFlow="postShock";
-        line(s,e,"SHOCK #"+s.shock);
+        line(s,e,"CLEAR FIRST — SHOCK #"+s.shock);
       }
     } else if (["running","paused"].includes(s.phase) && e.type === "epi") {
       if((s.fromNonShockable || (SHOCKABLE_RHYTHMS.has(s.rhythm) && s.shock>=2)) &&
@@ -296,7 +324,10 @@ function computeState() {
     } else if (["running","paused"].includes(s.phase) && e.type === "rhythm" &&
       ["VF","VT","PEA","Asystole"].includes(e.value)) {
       s.rhythm=e.value;
-      if(e.value==="PEA" || e.value==="Asystole")s.fromNonShockable=true;
+      if(e.value==="PEA" || e.value==="Asystole"){
+        s.fromNonShockable=true;
+        if(s.firstNonshockAt===null)s.firstNonshockAt=t;
+      }
       s.lastRhythmEventId=e.id;
       if(s.phase==="paused" && s.pauseReason==="cycle")s.pauseRhythmRecorded=true;
       if(SHOCKABLE_RHYTHMS.has(e.value)){
@@ -311,6 +342,7 @@ function computeState() {
     } else if (["running","paused"].includes(s.phase) && e.type === "peaWidth" &&
       s.rhythm==="PEA" && ["Narrow","Wide"].includes(e.value)) {
       s.peaWidth=e.value;
+      s.lastPeaWidth=e.value;
       line(s,e,"PEA QRS: "+e.value);
     } else if (["running","paused"].includes(s.phase) && e.type === "etTube" && !s.advancedAirway) {
       s.advancedAirway=true;
@@ -321,7 +353,8 @@ function computeState() {
       s.adjunctCounts[e.value]=(s.adjunctCounts[e.value]||0)+1;
       line(s,e,ADJUNCT_NAMES[e.value]);
     } else if(e.type==="finding" && ["running","paused"].includes(s.phase) &&
-      ["PEA","Asystole"].includes(s.rhythm) && FINDING_LABELS[e.value]){
+      FINDING_LABELS[e.value] &&
+      (!e.value.startsWith("pea:") || s.rhythm==="PEA")){
       const wasSelected=!!s.findings[e.value];
       if(e.value==="pea:pseudo" || e.value==="pea:true"){
         s.findings["pea:pseudo"]=false;s.findings["pea:true"]=false;
@@ -329,7 +362,6 @@ function computeState() {
       s.findings[e.value]=!wasSelected;
       line(s,e,(wasSelected?"UNCHECKED: ":"CHECKED: ")+FINDING_LABELS[e.value]);
     } else if(e.type==="procedure" && ["running","paused"].includes(s.phase) &&
-      ["PEA","Asystole"].includes(s.rhythm) &&
       PROCEDURE_NAMES[e.value] && !s.procedures[e.value]){
       s.procedures[e.value]=true;
       line(s,e,PROCEDURE_NAMES[e.value]);
@@ -431,7 +463,7 @@ function announceEvent(e,s) {
     start:"เริ่มซีพีอาร์ บันทึกริทึม",
     pause:e.value==="cycle"?"พักซีพีอาร์ ตรวจริทึม":"พักกดหน้าอก",
     reset:"รีเซ็ต",
-    shock:"ช็อกครั้งที่ "+s.shock+" "+shockAdvice(s),
+    shock:"เคลียร์ก่อน ช็อกครั้งที่ "+s.shock+" "+shockAdvice(s),
     epi:"อิพิเนฟริน ครั้งที่ "+s.epi,
     amio:"อามิโอดาโรน "+e.value+" มิลลิกรัม",
     rhythm:e.value==="VF"?"วีเอฟ":e.value==="VT"?"พีวีที":
@@ -457,9 +489,28 @@ function maskCoach(s,now){
 }
 function epiColor(s,clock){
   if(!["running","paused"].includes(s.phase))return "neutral";
-  if(s.lastEpiAt===null)return "neutral";
+  if(s.lastEpiAt===null){
+    if(s.firstNonshockAt!==null){
+      return Date.now()-s.firstNonshockAt>=FIRST_NONSHOCK_ALERT_MS?"red":"green";
+    }
+    if(SHOCKABLE_RHYTHMS.has(s.rhythm) && s.shock>=2)return "green";
+    return "neutral";
+  }
   if(clock.epiMs>=FIVE_MIN-EPI_PREWARN_MS)return "red";
   return clock.epiMs>=FOUR_MIN?"green":"neutral";
+}
+function epiBeforeFirstDose(s){
+  if(s.lastEpiAt!==null)return null;
+  if(!["running","paused"].includes(s.phase))return null;
+  if(s.fromNonShockable)return {
+    display:"SUGGEST ADRENALINE",
+    hint:"NONSHOCKABLE · CONSIDER AS SOON AS FEASIBLE"
+  };
+  if(SHOCKABLE_RHYTHMS.has(s.rhythm)&&s.shock>=2)return {
+    display:"CONSIDER ADRENALINE",
+    hint:"SHOCK #2 · CONSIDER ADRENALINE"
+  };
+  return null;
 }
 function playMetronomeBeat(when) {
   if (!audioContext || audioContext.state!=="running")return;
