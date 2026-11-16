@@ -1903,3 +1903,11 @@ body.tv-mode .tv-dash-foot{
   body.tv-mode .tv-dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   body.tv-mode .tv-dash-time-rows{gap:7px}
 }
+
+/* TV dashboard direct Re-Arrest control */
+body:not(.tv-mode).remote-stage-dashboard #stageDashboardReArrestBtn{
+  width:100%;min-height:76px;padding:12px;
+  border:2px solid #5de9bc;border-radius:15px;
+  background:#0d7657;color:#fff;
+  font-size:clamp(18px,4.5vw,27px);font-weight:900;
+}
