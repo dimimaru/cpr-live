@@ -933,7 +933,7 @@ function renderCauseTools(s){
   const toggle=document.getElementById("causeToolsToggle");
   toggle.disabled=!connected || !active;
   toggle.setAttribute("aria-expanded",String(active && causeToolsOpen));
-  const hasQrs=active && !!s.lastPeaWidth;
+  const hasQrs=active && s.rhythm==="PEA" && !!s.lastPeaWidth;
   document.getElementById("qrsInvestigations").hidden=!hasQrs;
   document.getElementById("qrsNarrowChecklist").hidden=!hasQrs||s.lastPeaWidth!=="Narrow";
   document.getElementById("qrsWideChecklist").hidden=!hasQrs||s.lastPeaWidth!=="Wide";
