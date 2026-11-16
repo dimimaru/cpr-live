@@ -1128,6 +1128,7 @@ function render() {
       clock.epiMs>=240000?"4 MIN • READY":"SINCE LAST DOSE",
     shock:s.shock,epi:s.epi,rhythm:s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm==="VT"?"pVT":s.rhythm,etco2:s.etco2===null?"—":s.etco2,
     episode:s.episode,ccf:clock.ccf===null?"—":clock.ccf.toFixed(1)+"%",
+    pauseCurrent:s.phase==="rosc" || s.phase==="standby"?"—":(clock.currentPauseMs/1000).toFixed(1)+" s",
     pauseTotal:timeText(clock.pauseMs),room
   };
   for (const [key,val] of Object.entries(values)) {
