@@ -1039,6 +1039,8 @@ function renderControllerStage(s) {
     (flow?flow!=="postShock":!cyclePaused || !s.pauseRhythmRecorded) ||
     pendingActions.has("resume") || actionCooldownRemaining(s,"resume",Date.now())>0;
   document.getElementById("shockButton").classList.toggle("critical",clearMs>=3000);
+  document.getElementById("shockButtonDirect").classList.toggle("critical",pauseMs>=3000);
+  document.getElementById("shockButtonCharging").classList.toggle("critical",pauseMs>=3000);
   document.getElementById("stageStartBtn").disabled=
     !connected || pendingActions.has("start");
   document.querySelectorAll(".stage-rhythm-button").forEach(btn=>{
@@ -1048,10 +1050,8 @@ function renderControllerStage(s) {
   document.querySelectorAll('[data-action="charge"]').forEach(btn=>{
     btn.disabled=!connected || flow!=="decision" || pendingActions.has("charge");
   });
-  document.querySelectorAll('[data-action="clear"]').forEach(btn=>{
-    btn.disabled=!connected || !["decision","charging"].includes(flow) ||
-      pendingActions.has("clear");
-  });
+  // Both visible pathways now offer direct SHOCK; legacy CLEAR events remain
+  // readable for rooms synced from earlier versions.
 }
 // Classify recorded events by the *documented* CPR cycle boundaries.
 // The pause / rhythm check / shock remain part of the ending cycle; only the
@@ -1166,28 +1166,20 @@ function render() {
   const freshShockable=SHOCKABLE_RHYTHMS.has(s.rhythm) &&
     s.lastRhythmEventId!==null && s.lastRhythmEventId!==s.lastShockRhythmEventId;
   const arrestActive=["running","paused"].includes(s.phase);
-  shockButton.disabled=!connected || s.phase!=="paused" ||
-    s.shockFlow!=="readyShock" || shockLocked || pendingShock || !freshShockable;
-  shockButton.classList.toggle("cooldown-locked",shockLocked || pendingShock);
-  if(shockLocked){
+  const canShock=arrestActive &&
+    ["decision","charging","readyShock"].includes(s.shockFlow);
+  const blocked=!connected || !canShock || shockLocked || pendingShock || !freshShockable;
+  for(const id of ["shockButton","shockButtonDirect","shockButtonCharging"]){
+    const btn=document.getElementById(id);
+    if(!btn)continue;
+    btn.disabled=blocked;
+    btn.classList.toggle("cooldown-locked",shockLocked||pendingShock);
     const seconds=Math.ceil(shockRemaining/1000);
-    const remainingText=fmt(Math.floor(seconds/60))+":"+fmt(seconds%60);
-    shockButton.textContent=remainingText;
-    shockHint.hidden=true; // No duplicate cooldown message below the button.
-  }else if(pendingShock){
-    shockButton.textContent="⚡ SAVING SHOCK…";
-    shockHint.textContent="กำลังบันทึก Shock";
-    shockHint.hidden=false;
-  }else if(arrestActive && !freshShockable){
-    shockButton.textContent="⚡ SHOCK";
-    shockHint.textContent=SHOCKABLE_RHYTHMS.has(s.rhythm)?
-      "บันทึก VF / pVT อีกครั้งก่อน Shock ทุกครั้ง":
-      "ต้องเลือกและยืนยัน Rhythm เป็น VF หรือ pVT ก่อน Shock";
-    shockHint.hidden=false;
-  }else{
-    shockButton.textContent="⚡ SHOCK";
-    shockHint.hidden=true;
+    const cooldown=fmt(Math.floor(seconds/60))+":"+fmt(seconds%60);
+    btn.textContent=shockLocked?"⚡ SHOCK · "+cooldown:
+      pendingShock?"⚡ SAVING SHOCK…":"⚡ SHOCK · CLEAR FIRST";
   }
+  shockHint.hidden=true; // Single label; no duplicate cooldown below Shock.
   const pauseResume=document.getElementById("pauseResumeBtn");
   const resume=s.phase==="paused";
   pauseResume.dataset.action=resume?"resume":"pause";
