@@ -677,16 +677,18 @@ function checkAlarms(s,clock) {
   }
   const ongoing=connected && s.phase==="running" && s.sessionId;
   const cycle=clock.cycleMs;
-  const cycleIndex=Math.floor(cycle/TWO_MIN);
-  const inLastTen=ongoing && cycle%TWO_MIN>=TWO_MIN-10000 && cycle%TWO_MIN<TWO_MIN;
-  const inLastFive=inLastTen && cycle%TWO_MIN>=TWO_MIN-5000;
+  const cycleKey=room+"|"+s.sessionId+"|"+s.episode+"|"+s.cycleAnchor;
+  // Alarms run once per documented two-minute cycle, never every 2 minutes
+  // of overtime while a manual interruption is in progress.
+  const inLastTen=ongoing && cycle>=TWO_MIN-10000 && cycle<TWO_MIN;
+  const inLastFive=inLastTen && cycle>=TWO_MIN-5000;
   overlay.classList.toggle("alarm-on",!!inLastTen);
   overlay.classList.toggle("message-on",!!inLastFive);
   const announcements=[];
   if (inLastTen) {
     document.getElementById("alarmSeconds").textContent=
-      String(Math.ceil((TWO_MIN-cycle%TWO_MIN)/1000));
-    const key=room+"|"+s.sessionId+"|"+s.episode+"|"+cycleIndex;
+      String(Math.ceil((TWO_MIN-cycle)/1000));
+    const key=cycleKey;
     if (audioReady && tvMode && nearAlarmKey!==key) {
       nearAlarmKey=key;
       announcements.push(SHOCKABLE_RHYTHMS.has(s.rhythm)?
@@ -694,12 +696,12 @@ function checkAlarms(s,clock) {
         "อีกสิบวินาที ตรวจริทึม");
     }
   }
-  if (ongoing && cycleIndex>=1 && audioReady && tvMode) {
-    const key=room+"|"+s.sessionId+"|"+s.episode+"|"+cycleIndex;
+  if (ongoing && cycle>=TWO_MIN && audioReady && tvMode) {
+    const key=cycleKey;
     if (cycleEndKey!==key) {
       cycleEndKey=key;
       // Skip stale boundary announcements if the TV was suspended and resumed.
-      if (cycle%TWO_MIN<3000)announcements.push("ตรวจริทึม");
+      if (cycle<TWO_MIN+3000)announcements.push("ตรวจริทึม");
     }
   }
   const doseTimingActive=connected && ["running","paused"].includes(s.phase) && s.lastEpiAt!==null;
