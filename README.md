@@ -354,3 +354,13 @@ Clinical references:
 - AHA 2025 adult ALS: https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines/adult-advanced-life-support/
 - RCUK/ERC 2025 ALS: https://www.resus.org.uk/professional-library/2025-resuscitation-guidelines/adult-advanced-life-support-guidelines
 - Narrow/Wide PEA teaching hypothesis and limitations: https://pmc.ncbi.nlm.nih.gov/articles/PMC5586830/
+
+
+## V2.2 — Once-only ECG-lead prompt, manual hands-off, TV Dashboard sync
+
+- The **ECG LEADS NOT READY** escape is offered only until the **first documented rhythm** (VF/pVT/PEA/Asystole) in a session. Recording the first rhythm sets the shared `leadsAttached` flag; subsequent automatic 2-minute rhythm checks show the four rhythm buttons and ROSC only. The flag persists across ROSC and re-arrest, but Reset clears it.
+- After initial rhythm documentation, the normal Remote shows **PAUSE CPR · HANDS-OFF**. This records a `manual` compression interruption without navigating to rhythm selection. **RESUME CPR · HANDS-ON** closes the interruption; the current 2-minute CPR clock continues from its original cycle anchor and is **not** reset. If that clock has already passed 2 minutes on return, the next normal cycle-check prompt becomes due. Each manual pause contributes to cumulative recorded hands-off and CCF.
+- The **automatic 2-minute rhythm check** remains separate: it opens rhythm assessment, and resuming after a completed assessment begins the next 2-minute cycle. Shockable rhythm and post-shock Resume behavior is unchanged.
+- The TV's hidden legacy Controller markup no longer includes Reset or 105 BPM buttons. Those controls remain on the Remote.
+- In ROSC, selecting Dashboard on the Remote broadcasts the shared display event on the existing CPR channel and redundantly on a dedicated `cpr-display` event. The TV renders its horizontal case Dashboard when synced; Back switches to the monitor state, and Re-arrest automatically restores the CPR monitor on TV. All devices must be connected to the **same room**. Realtime broadcasting is ephemeral and not guaranteed during a disconnection.
+- **Important:** hands-off/CCF values are computed from manually logged Pause/Resume/Shock events, not measured compressions. ECG lead status reflects first logged rhythm selection, not physical ECG lead sensing.
