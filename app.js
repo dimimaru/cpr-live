@@ -783,6 +783,7 @@ function renderInterruption(s,clock){
     document.getElementById("tvRhythmPauseMessage").textContent=
       s.shockFlow==="readyShock"?"CLEAR — SHOCK":
       s.shockFlow==="postShock"?"SHOCK RECORDED — RESUME CPR":
+      s.pauseReason==="manual"?"CPR INTERRUPTED — RESUME COMPRESSIONS":
       cyclePause && s.pauseRhythmRecorded?"RHYTHM IDENTIFIED — RESUME CPR":
       "PAUSE CPR — IDENTIFY RHYTHM";
     document.getElementById("tvRhythmPauseElapsed").textContent=
