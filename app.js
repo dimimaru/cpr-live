@@ -1207,8 +1207,10 @@ function timelineWithCycles(entries){
 function render() {
   const s=computeState();
   const clock=elapsedFor(s,Date.now());
-  const cycleProgress=s.phase==="standby"?0:clock.cycleMs%TWO_MIN;
-  const currentCycle=s.phase==="standby"?TWO_MIN:cycleProgress===0?TWO_MIN:TWO_MIN-cycleProgress;
+  // Never wrap to 02:00 merely because a manual hands-off interruption
+  // carries the existing cycle past its two-minute limit. A new 02:00 starts
+  // only when the reducer records a completed rhythm check and Resume CPR.
+  const currentCycle=s.phase==="standby"?TWO_MIN:Math.max(0,TWO_MIN-clock.cycleMs);
   const cue=medicationCue(s,clock);
   const firstDoseStatus=epiBeforeFirstDose(s);
   const values={
