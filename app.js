@@ -42,7 +42,7 @@ const SHOCKABLE_RHYTHMS = new Set(["VF","VT"]);
 const ADJUNCT_NAMES={
   nahco3:"7.5% NaHCO₃", // legacy events
   nahco3_1:"7.5% NaHCO₃ · 1 amp",nahco3_2:"7.5% NaHCO₃ · 2 amp",
-  calcium:"10% Calcium",glucose:"50% Glucose",lidocaine:"Lidocaine",
+  calcium:"10% Calcium",calcium_1:"10% Calcium · 1 amp",calcium_2:"10% Calcium · 2 amp",calcium_3:"10% Calcium · 3 amp",glucose:"50% Glucose",lidocaine:"Lidocaine",
   prc:"PRC · 1 unit"
 };
 const FINDING_LABELS={
@@ -105,6 +105,7 @@ let dashboardOpen=false;
 let causeToolsOpen=false;
 let causeTab="pocus";
 let bicarbPickerOpen=false;
+let calciumPickerOpen=false;
 let roscReviewOpen=false; // Local checklist review; ROSC broadcasts only on confirmation.
 
 // Audio is deliberately TV-only. Browsers require a gesture on each TV page
@@ -124,9 +125,9 @@ const METRONOME_BPM=105;
 const METRONOME_INTERVAL=60/METRONOME_BPM;
 const COMPRESSION_BEAT_MS=60000/METRONOME_BPM;
 const THIRTY_BEATS_MS=30*COMPRESSION_BEAT_MS;
-const BREATH_DURATION_MS=1500; // 1.5-second inspiratory visual cue
-const BREATH_RELEASE_MS=500;
-const TWO_BREATHS_MS=2*BREATH_DURATION_MS+BREATH_RELEASE_MS; // 3.5 s total
+const BREATH_DURATION_MS=1000; // 2025 adult BLS: each breath takes about 1 second.
+const BREATH_RELEASE_MS=750; // Brief release/transition within a 3.5 s coached pause.
+const TWO_BREATHS_MS=2*(BREATH_DURATION_MS+BREATH_RELEASE_MS); // 3.5 s total (estimated)
 const MASK_CYCLE_MS=THIRTY_BEATS_MS+TWO_BREATHS_MS;
 
 document.body.classList.toggle("tv-mode",tvMode);
@@ -151,6 +152,7 @@ function blankState() {
     ecgPending:false, // ECG leads not yet ready; CPR continues until next rhythm check.
     leadsAttached:false, // Becomes true after the first documented ECG rhythm; persists through re-arrest.
     pauseAccruedMs:0,
+    pauseSpans:[],compressionSpans:[],activeCompressionAt:null,
     arrestAccruedMs:0,
     episodeStartAt:null,
     frozenCycleMs:0,
@@ -175,6 +177,51 @@ function line(state,e,label) {
   if(e.type!=="shock" && e.type!=="epi" && e.type!=="reset"){
     state.lastActionAt[actionGroup(e.type,e.value)]=e.ts;
   }
+}
+// Record explicit interruption intervals separately from the estimated 30:2 coach.
+function closeCompression(s,t){
+  if(s.activeCompressionAt!==null && t>s.activeCompressionAt){
+    s.compressionSpans.push({start:s.activeCompressionAt,end:t,anchor:s.coachAnchor,
+      advancedAirway:s.advancedAirway});
+  }
+  s.activeCompressionAt=null;
+}
+function beginCompression(s,t){s.coachAnchor=t;s.activeCompressionAt=t;}
+function closePause(s,t){
+  if(s.pausedAt!==null && t>s.pausedAt){
+    s.pauseSpans.push({start:s.pausedAt,end:t,kind:s.pauseReason||"manual"});
+  }
+}
+function cumulativeCoachedBreaths(ms){
+  const elapsed=Math.max(0,ms);
+  const full=Math.floor(elapsed/MASK_CYCLE_MS);
+  return full*TWO_BREATHS_MS+Math.min(TWO_BREATHS_MS,
+    Math.max(0,elapsed-full*MASK_CYCLE_MS-THIRTY_BEATS_MS));
+}
+function coachedPauseMillis(span){
+  if(span.advancedAirway||span.anchor===null)return 0;
+  return Math.max(0,cumulativeCoachedBreaths(span.end-span.anchor)-
+    cumulativeCoachedBreaths(span.start-span.anchor));
+}
+function coachedBreathSpans(span){
+  if(span.advancedAirway||span.anchor===null)return [];
+  const spans=[];
+  const first=Math.max(0,Math.floor((span.start-span.anchor)/MASK_CYCLE_MS));
+  const last=Math.floor((span.end-span.anchor)/MASK_CYCLE_MS);
+  for(let n=first;n<=last;n++){
+    const start=Math.max(span.start,span.anchor+n*MASK_CYCLE_MS+THIRTY_BEATS_MS);
+    const end=Math.min(span.end,span.anchor+(n+1)*MASK_CYCLE_MS);
+    if(end>start)spans.push({start,end,kind:"ventilation"});
+  }
+  return spans;
+}
+function runningCompressionSpans(s,now){
+  const spans=s.compressionSpans.slice();
+  if(s.phase==="running" && s.activeCompressionAt!==null){
+    spans.push({start:s.activeCompressionAt,end:now,anchor:s.coachAnchor,
+      advancedAirway:s.advancedAirway});
+  }
+  return spans;
 }
 function computeState() {
   const s = blankState();
@@ -218,12 +265,13 @@ function computeState() {
       // Before a dose the TV displays "NO NEED".
       line(s,e,recurrent?"RE-ARREST — START CPR #"+s.episode:"START CPR");
     } else if (e.type === "pause" && s.phase === "running") {
+      closeCompression(s,t);
       // Compression interruption does NOT stop the 2-min cycle or epinephrine clock.
       s.pausedAt=t;
       s.pauseId=e.id;
       // User interruptions inside a two-minute cycle must NOT re-anchor it.
       // The scheduled two-minute check still opens the rhythm selector.
-      s.pauseReason=e.value==="cycle"?"cycle":e.value==="manual"&&s.leadsAttached?"manual":"rhythm";
+      s.pauseReason=e.value==="cycle"?"cycle":e.value==="rhythm"||!s.leadsAttached?"rhythm":"manual";
       s.pauseRhythmRecorded=false;
       if(s.pauseReason!=="manual")s.ecgPending=false;
       s.phase="paused";
@@ -234,6 +282,7 @@ function computeState() {
       !s.pauseRhythmRecorded && !s.shockFlow) {
       // Continue compressions while ECG leads are being attached. The rhythm
       // stays unknown (or the previous confirmed rhythm) until re-assessment.
+      closePause(s,t);
       s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
       s.pausedAt=null;
       s.pauseId=null;
@@ -242,18 +291,19 @@ function computeState() {
       s.phase="running";
       s.ecgPending=true;
       s.cycleAnchor=t;
-      s.coachAnchor=t;
+      beginCompression(s,t);
       line(s,e,"CONTINUE CPR — ECG LEADS NOT READY; CHECK RHYTHM LATER");
     } else if (e.type === "charge" &&
       s.shockFlow==="decision" && ["running","paused"].includes(s.phase)) {
       // Compression continues during charging. Close any earlier rhythm-check pause.
       if(s.phase==="paused" && s.pausedAt!==null){
+        closePause(s,t);
         s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
         s.pausedAt=null;
         s.pauseId=null;
         s.pauseReason=null;
         s.pauseRhythmRecorded=false;
-        s.coachAnchor=t;
+        beginCompression(s,t);
       }
       s.phase="running";
       s.shockFlow="charging";
@@ -262,6 +312,7 @@ function computeState() {
       ["decision","charging"].includes(s.shockFlow) &&
       ["running","paused"].includes(s.phase)) {
       if(s.phase==="running"){
+        closeCompression(s,t);
         s.phase="paused";
         s.pausedAt=t;
         s.pauseId=e.id;
@@ -276,6 +327,7 @@ function computeState() {
       if(s.shockFlow && s.shockFlow!=="postShock")continue;
       if(["cycle","rhythm"].includes(s.pauseReason) && !s.pauseRhythmRecorded)continue;
       const interruption=Math.max(0,t-s.pausedAt);
+      closePause(s,t);
       s.pauseAccruedMs+=interruption;
       if(["cycle","rhythm"].includes(s.pauseReason) || s.shockFlow==="postShock"){
         s.cycleAnchor=t; // Next two-minute cycle begins only after Resume.
@@ -285,11 +337,13 @@ function computeState() {
       s.pauseReason=null;
       s.pauseRhythmRecorded=false;
       s.phase="running";
-      s.coachAnchor=t;
+      beginCompression(s,t);
       s.shockFlow=null;
       s.clearAt=null;
       line(s,e,"RESUME COMPRESSIONS — interruption "+timeText(interruption));
     } else if (e.type === "rosc" && ["running","paused"].includes(s.phase)) {
+      if(s.phase==="running")closeCompression(s,t);
+      else closePause(s,t);
       if (s.pausedAt!==null) s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
       s.arrestAccruedMs+=Math.max(0,t-s.episodeStartAt);
       s.episodeStartAt=null;
@@ -315,6 +369,7 @@ function computeState() {
         // defibrillator. Compression interruption begins at this tap when
         // charging CPR was running; an existing rhythm-check pause is retained.
         if(s.phase==="running"){
+          closeCompression(s,t);
           s.phase="paused";
           s.pausedAt=t;
           s.pauseId=e.id;
@@ -350,6 +405,7 @@ function computeState() {
       // Old remotes can still broadcast a rhythm without first pressing Pause.
       // Treat the record as the beginning of an interruption until Resume CPR.
       if(s.phase==="running"){
+        closeCompression(s,t);
         s.phase="paused";
         s.pausedAt=t;
         s.pauseId=e.id;
@@ -379,7 +435,9 @@ function computeState() {
       s.lastPeaWidth=e.value;
       line(s,e,"PEA QRS: "+e.value);
     } else if (["running","paused"].includes(s.phase) && e.type === "etTube" && !s.advancedAirway) {
+      if(s.phase==="running")closeCompression(s,t);
       s.advancedAirway=true;
+      if(s.phase==="running")beginCompression(s,t);
       s.ventAnchor=t;
       line(s,e,"ET-TUBE (reported placed) — ventilation coach started");
     } else if (e.type==="adjunct" &&
@@ -427,14 +485,21 @@ function elapsedFor(s,now) {
     s.phase==="paused"?Math.max(0,s.pausedAt-s.ventAnchor):0;
   const arrestMs=s.arrestAccruedMs+
     (active && s.episodeStartAt!==null?Math.max(0,now-s.episodeStartAt):0);
-  const currentPauseMs=s.phase==="paused" && s.pausedAt!==null?
+  const loggedCurrentPauseMs=s.phase==="paused" && s.pausedAt!==null?
     Math.max(0,now-s.pausedAt):0;
-  const pauseMs=Math.min(arrestMs,s.pauseAccruedMs+currentPauseMs);
+  const ventilationPauseMs=runningCompressionSpans(s,now)
+    .reduce((total,span)=>total+coachedPauseMillis(span),0);
+  // Explicit pauses never overlap coached breath intervals: running segments
+  // are closed on pause, shock, rhythm assessment, ROSC and airway changes.
+  const pauseMs=Math.min(arrestMs,s.pauseAccruedMs+loggedCurrentPauseMs+ventilationPauseMs);
+  const coachPosition=s.phase==="running"&&!s.advancedAirway?
+    maskCoach(s,now).position:0;
+  const currentPauseMs=loggedCurrentPauseMs||Math.max(0,coachPosition-THIRTY_BEATS_MS);
   const compressionMs=Math.max(0,arrestMs-pauseMs);
   const ccf=arrestMs>0?(compressionMs/arrestMs)*100:null;
   const pauseRemainingMs=Math.max(0,10000-currentPauseMs);
   return {totalMs,cycleMs,epiMs,ventMs,arrestMs,pauseMs,currentPauseMs,
-    pauseRemainingMs,compressionMs,ccf};
+    pauseRemainingMs,compressionMs,ccf,ventilationPauseMs};
 }
 function timeText(ms) {
   const sec=Math.floor(Math.max(0,ms)/1000);
@@ -521,8 +586,9 @@ function maskCoach(s,now){
     return {round,position,breath:0,count:Math.min(30,Math.floor(position/COMPRESSION_BEAT_MS)+1),squeeze:false};
   }
   const b=position-THIRTY_BEATS_MS;
-  return {round,position,breath:b<BREATH_DURATION_MS+BREATH_RELEASE_MS?1:2,
-    count:30,squeeze:b<BREATH_DURATION_MS||b>=BREATH_DURATION_MS+BREATH_RELEASE_MS};
+  const breathInterval=BREATH_DURATION_MS+BREATH_RELEASE_MS;
+  return {round,position,breath:b<breathInterval?1:2,
+    count:30,squeeze:(b%breathInterval)<BREATH_DURATION_MS};
 }
 function epiColor(s,clock){
   if(!["running","paused"].includes(s.phase))return "neutral";
@@ -770,7 +836,7 @@ function renderECG(s){
 function renderInterruption(s,clock){
   const paused=s.phase==="paused"&&s.pausedAt!==null;
   const mobile=document.getElementById("pauseInfo");
-  mobile.hidden=!paused;
+  mobile.hidden=true; // Unified Pause/Resume button now carries the countdown.
   if(paused){
     const remaining=Math.max(0,Math.ceil(clock.pauseRemainingMs/1000));
     document.getElementById("pauseCountdown").textContent=String(remaining);
@@ -823,7 +889,7 @@ function renderVentilation(s,clock) {
     const coach=maskCoach(s,paused?s.pausedAt:Date.now());
     number=coach.breath?coach.breath+"/2":coach.count+"/30";
     squeeze=!paused&&coach.squeeze;
-    label=coach.breath?(coach.squeeze?"AMBU • 1.5 s":"RELEASE • 0.5 s"):"COMPRESSIONS";
+    label=coach.breath?(coach.squeeze?"AMBU • 1 s":"RELEASE • 0.75 s"):"COMPRESSIONS";
     mobileLabel=coach.breath?(coach.squeeze?"BREATH "+coach.breath+"/2":"RELEASE"):"COMPRESSIONS";
   }
   if(paused){label=mobileLabel="CPR PAUSED";}
@@ -856,7 +922,8 @@ function recordedMedLabSummary(s){
   const counts=s.adjunctCounts||{};
   const bicarb=(counts.nahco3||0)+(counts.nahco3_1||0)+2*(counts.nahco3_2||0);
   if(bicarb)meds.push("NaHCO₃ "+bicarb+" amp");
-  if(counts.calcium)meds.push("Calcium ×"+counts.calcium);
+  const calciumAmps=(counts.calcium||0)+(counts.calcium_1||0)+2*(counts.calcium_2||0)+3*(counts.calcium_3||0);
+  if(calciumAmps)meds.push("Calcium "+calciumAmps+" amp");
   if(counts.glucose)meds.push("Dextrose 50% ×"+counts.glucose);
   if(counts.lidocaine)meds.push("Lidocaine ×"+counts.lidocaine);
   if(counts.prc)meds.push("PRC "+counts.prc+" unit");
@@ -962,7 +1029,7 @@ function roscSelectionAvailable(s){
 function renderCauseTools(s){
   if(tvMode)return;
   const active=["running","paused"].includes(s.phase);
-  if(!active){bicarbPickerOpen=false;causeToolsOpen=false;causeTab="pocus";}
+  if(!active){bicarbPickerOpen=false;calciumPickerOpen=false;causeToolsOpen=false;causeTab="pocus";}
   const tool=document.getElementById("nonShockTools");
   tool.hidden=!active; // POCUS, lab and trauma remain available for VF/pVT too.
   document.getElementById("causeToolsPanel").hidden=!active||!causeToolsOpen;
@@ -997,6 +1064,8 @@ function renderCauseTools(s){
   const picker=document.getElementById("bicarbDosePicker");
   picker.hidden=!active||!bicarbPickerOpen;
   document.getElementById("bicarbToggle").disabled=!connected||!active;
+  document.getElementById("calciumDosePicker").hidden=!active||!calciumPickerOpen;
+  document.getElementById("calciumToggle").disabled=!connected||!active;
 }
 function renderReportDashboard(s,clock){
   if(tvMode||s.phase!=="rosc")return;
@@ -1030,7 +1099,9 @@ function renderReportDashboard(s,clock){
   const records=[];
   const amps=(s.adjunctCounts.nahco3_1||0)+2*(s.adjunctCounts.nahco3_2||0)+(s.adjunctCounts.nahco3||0);
   if(amps)records.push(["7.5% NaHCO₃",amps+" amp"]);
-  for(const [key,label]of [["prc","PRC"],["calcium","Calcium"],["glucose","Glucose"],["lidocaine","Lidocaine"]]){
+  const ca=(s.adjunctCounts.calcium||0)+(s.adjunctCounts.calcium_1||0)+2*(s.adjunctCounts.calcium_2||0)+3*(s.adjunctCounts.calcium_3||0);
+  if(ca)records.push(["10% Calcium",ca+" amp"]);
+  for(const [key,label]of [["prc","PRC"],["glucose","Glucose"],["lidocaine","Lidocaine"]]){
     if(s.adjunctCounts[key])records.push([label,key==="prc"?s.adjunctCounts[key]+" unit":s.adjunctCounts[key]+" records"]);
   }
   const procedures=s.timeline.filter(e=>e.label==="ICD Lt"||e.label==="ICD Rt");
@@ -1050,6 +1121,90 @@ function renderReportDashboard(s,clock){
     }
   }
 }
+// Build an intervention timeline on the TV report from the SAME event-sourced
+// state used by CPR timing and CCF. The 30:2 breath bands are coach estimates.
+function renderTvActionTimeline(s){
+  if(!tvMode)return;
+  const host=document.getElementById("tvActionTimeline");
+  if(!host||s.firstStartAt===null)return;
+  const signature=s.timeline.map(item=>item.id).join("|");
+  if(host.dataset.signature===signature)return;
+  host.dataset.signature=signature;
+  const start=s.firstStartAt;
+  const roscEvents=s.timeline.filter(item=>item.label.startsWith("ROSC —"));
+  const end=roscEvents.length?roscEvents[roscEvents.length-1].ts:Date.now();
+  const total=Math.max(1000,end-start);
+  const percent=t=>Math.max(0,Math.min(100,(t-start)*100/total));
+  host.replaceChildren();
+  const track=document.createElement("div");
+  track.className="tv-time-track";
+  const stops=[...s.pauseSpans,...s.compressionSpans.flatMap(coachedBreathSpans)]
+    .filter(item=>item.end>start && item.start<end)
+    .sort((a,b)=>a.start-b.start);
+  for(const interval of stops){
+    const left=percent(Math.max(start,interval.start));
+    const right=percent(Math.min(end,interval.end));
+    if(right<=left)continue;
+    const bar=document.createElement("span");
+    bar.className="tv-time-handoff"+
+      (interval.kind==="ventilation"?" tv-time-breath":" tv-time-manual");
+    bar.style.left=left+"%";
+    bar.style.width=(right-left)+"%";
+    const type=interval.kind==="ventilation"?"Coached 30:2 breaths":"Recorded CPR interruption";
+    bar.title=type+" · +"+timeText(interval.start-start)+" to +"+
+      timeText(interval.end-start);
+    track.append(bar);
+  }
+  host.append(track);
+  const events=s.timeline.filter(item=>{
+    const name=item.label;
+    return name.startsWith("RHYTHM: ")||
+      name.startsWith("CLEAR FIRST — SHOCK")||
+      name.startsWith("EPINEPHRINE ")||
+      name.startsWith("AMIODARONE ")||
+      name.startsWith("7.5% NaHCO")||
+      name.startsWith("10% Calcium")||
+      name.startsWith("50% Glucose")||
+      name.startsWith("Lidocaine")||
+      name.startsWith("PRC ·")||
+      name.startsWith("ICD ")||
+      name.startsWith("ROSC —");
+  });
+  // Limit only displayed marker density, not the underlying bands or recorded data.
+  events.slice(-48).forEach((entry,index)=>{
+    const title=entry.label;
+    const icon=title.startsWith("CLEAR FIRST")?"⚡":
+      title.startsWith("RHYTHM")?"♥":
+      title.startsWith("ROSC")?"✓":
+      title.startsWith("ICD")?"✚":"💉";
+    const marker=document.createElement("span");
+    marker.className="tv-time-marker tv-time-marker-"+(index%2);
+    marker.textContent=icon;
+    marker.style.left=percent(entry.ts)+"%";
+    marker.style.animationDelay=Math.min(0.8,percent(entry.ts)/125).toFixed(2)+"s";
+    marker.title="+"+timeText(entry.ts-start)+" · "+title;
+    marker.setAttribute("aria-label",marker.title);
+    host.append(marker);
+  });
+  const scale=document.createElement("div");
+  scale.className="tv-time-axis";
+  for(let i=0;i<=4;i++){
+    const tick=document.createElement("span");
+    tick.textContent=timeText(total*i/4);
+    scale.append(tick);
+  }
+  host.append(scale);
+  const details=document.getElementById("tvTimelineEvents");
+  if(details){
+    details.replaceChildren();
+    for(const item of events.slice(-6).reverse()){
+      const line=document.createElement("span");
+      line.textContent="+"+timeText(item.ts-start)+" · "+item.label;
+      details.append(line);
+    }
+  }
+}
+
 function renderTvReportDashboard(s,clock){
   if(!tvMode)return;
   const active=s.phase==="rosc" && !!s.tvDashboard;
@@ -1102,6 +1257,7 @@ function renderTvReportDashboard(s,clock){
   const procedures=Object.entries(s.procedures)
     .filter(([,checked])=>!!checked).map(([key])=>PROCEDURE_NAMES[key]||key);
   put("tvDashProcedures",procedures.join(" · ")||"—");
+  renderTvActionTimeline(s);
 }
 function renderControllerStage(s) {
   if(tvMode)return;
@@ -1134,6 +1290,7 @@ function renderControllerStage(s) {
   document.getElementById("stageDashboardBtn").disabled=stage!=="reArrest";
   document.getElementById("stageDashboardPdfBtn").disabled=stage!=="dashboard";
   document.getElementById("stageDashboardBackBtn").disabled=stage!=="dashboard";
+  if(stage==="rhythm"){causeToolsOpen=false;causeTab="pocus";}
   if(stage==="dashboard")renderReportDashboard(s,elapsedFor(s,Date.now()));
   const rhythmRosc=document.getElementById("stageRoscPromptBtn");
   rhythmRosc.disabled=!connected || stage!=="rhythm";
@@ -1319,19 +1476,27 @@ function render() {
   shockHint.hidden=true; // Single label; no duplicate cooldown below Shock.
   const pauseResume=document.getElementById("pauseResumeBtn");
   const manualPaused=s.phase==="paused" && s.pauseReason==="manual";
+  const firstRhythmPending=s.phase==="running"&&!s.leadsAttached;
   pauseResume.dataset.action=manualPaused?"resume":"pause";
-  pauseResume.dataset.value=manualPaused?"":"manual";
-  pauseResume.textContent=manualPaused?"▶ RESUME CPR · HANDS-ON":"Ⅱ PAUSE CPR · HANDS-OFF";
+  pauseResume.dataset.value=manualPaused?"":firstRhythmPending?"rhythm":"manual";
+  const remaining=Math.max(0,(10000-clock.currentPauseMs)/1000);
+  pauseResume.textContent=manualPaused?
+    "▶ RESUME CPR · "+(remaining>0?remaining.toFixed(1)+" s LEFT":"OVER 10 s")+
+    " · HANDS-OFF "+(clock.currentPauseMs/1000).toFixed(1)+" s":
+    firstRhythmPending?"Ⅱ PAUSE CPR · CHECK RHYTHM":"Ⅱ PAUSE CPR";
   pauseResume.classList.toggle("resume-flash",manualPaused);
-  pauseResume.hidden=!s.leadsAttached || !(s.phase==="running" || manualPaused);
-  pauseResume.disabled=!connected || !s.leadsAttached || !!s.shockFlow ||
+  pauseResume.classList.toggle("pause-overrun",manualPaused&&remaining===0);
+  pauseResume.hidden=!(s.phase==="running" || manualPaused);
+  pauseResume.disabled=!connected || !!s.shockFlow ||
     !(s.phase==="running" || manualPaused) ||
     pendingActions.has(manualPaused?"resume":"pause");
   const metro=document.getElementById("toggleMetronome");
   if(metro){
     metro.classList.toggle("active",s.metronomeOn);
     metro.setAttribute("aria-pressed",String(s.metronomeOn));
-    metro.textContent="🎵 105 BPM "+(s.metronomeOn?"ON":"OFF");
+    metro.textContent=s.metronomeOn?"🔊":"🔇";
+    metro.setAttribute("aria-label","Metronome 105 BPM "+(s.metronomeOn?"on":"off"));
+    metro.title="Metronome 105 BPM "+(s.metronomeOn?"on":"off");
   }
   const medication=nextMedication(s,clock);
   const epiControl=document.getElementById("epiControl");
@@ -1464,8 +1629,7 @@ async function handleAction(type,value) {
   const s=computeState();
   if (type==="start" && !["standby","rosc"].includes(s.phase))return;
   if (type==="display" && (s.phase!=="rosc" || !["dashboard","monitor"].includes(value)))return;
-  if (type==="pause" && (s.phase!=="running" ||
-      (value==="manual" && !s.leadsAttached)))return;
+  if (type==="pause" && s.phase!=="running")return;
   if (type==="leadWait" && !(s.phase==="paused" && !s.leadsAttached &&
       ["cycle","rhythm"].includes(s.pauseReason) && !s.pauseRhythmRecorded && !s.shockFlow))return;
   if (type==="resume" && s.phase!=="paused")return;
@@ -1888,6 +2052,12 @@ if(!tvMode){
     bicarbPickerOpen=!bicarbPickerOpen;
     render();
   });
+  document.getElementById("calciumToggle").addEventListener("click",()=>{
+    const s=computeState();
+    if(!connected||!["running","paused"].includes(s.phase))return;
+    calciumPickerOpen=!calciumPickerOpen;
+    render();
+  });
   document.getElementById("causeToolsToggle").addEventListener("click",()=>{
     const s=computeState();
     if(!connected||!["running","paused"].includes(s.phase))return;
@@ -1914,6 +2084,7 @@ document.querySelectorAll("[data-action]").forEach(btn=>
     }
     // PAUSE CPR must be immediate: confirmation would add avoidable hands-off delay.
     if(action==="adjunct" && btn.dataset.value.startsWith("nahco3_"))bicarbPickerOpen=false;
+    if(action==="adjunct" && btn.dataset.value.startsWith("calcium_"))calciumPickerOpen=false;
     handleAction(action,btn.dataset.value);
   })
 );
