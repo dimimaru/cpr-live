@@ -19,7 +19,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v2.2</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v2.3</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -163,6 +163,14 @@
           <div><span>EPINEPHRINE</span><strong id="tvDashEpi">0</strong></div>
           <div><span>AMIODARONE</span><strong id="tvDashAmio">—</strong></div>
         </div>
+        <section class="tv-event-timeline" aria-label="CPR event timeline with recorded interruptions and estimated ventilation hands-off">
+          <div class="tv-event-timeline-heading">
+            <strong>CPR ACTION TIMELINE</strong>
+            <span><b class="legend-swatch logged"></b> Recorded hands-off <b class="legend-swatch coached"></b> 30:2 coached breaths · 💉 Medications · ⚡ Shock · ♥ Rhythm</span>
+          </div>
+          <div id="tvActionTimeline" class="tv-timeline-visual" aria-label="Timeline chart"></div>
+          <div id="tvTimelineEvents" class="tv-timeline-recent" aria-label="Recent documented interventions"></div>
+        </section>
         <div class="tv-dash-body">
           <div class="tv-dash-panel tv-dash-time">
             <h3>CPR PERFORMANCE</h3>
@@ -267,12 +275,12 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V2.2 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V2.3 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
     </footer>
   </div>
   <script>window.CPR_FORCE_TV_MODE=true;</script>
   <script src="./config.js"></script>
-  <script type="module" src="./app.js?v=2.2.1"></script>
+  <script type="module" src="./app.js?v=2.3.0"></script>
 </body>
 </html>
