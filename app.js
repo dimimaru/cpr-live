@@ -42,7 +42,7 @@ const SHOCKABLE_RHYTHMS = new Set(["VF","VT"]);
 const ADJUNCT_NAMES={
   nahco3:"7.5% NaHCO₃", // legacy events
   nahco3_1:"7.5% NaHCO₃ · 1 amp",nahco3_2:"7.5% NaHCO₃ · 2 amp",
-  calcium:"10% Calcium",glucose:"50% Glucose",lidocaine:"Lidocaine",
+  calcium:"10% Calcium",calcium_1:"10% Calcium · 1 amp",calcium_2:"10% Calcium · 2 amp",calcium_3:"10% Calcium · 3 amp",glucose:"50% Glucose",lidocaine:"Lidocaine",
   prc:"PRC · 1 unit"
 };
 const FINDING_LABELS={
@@ -105,6 +105,7 @@ let dashboardOpen=false;
 let causeToolsOpen=false;
 let causeTab="pocus";
 let bicarbPickerOpen=false;
+let calciumPickerOpen=false;
 let roscReviewOpen=false; // Local checklist review; ROSC broadcasts only on confirmation.
 
 // Audio is deliberately TV-only. Browsers require a gesture on each TV page
@@ -124,9 +125,9 @@ const METRONOME_BPM=105;
 const METRONOME_INTERVAL=60/METRONOME_BPM;
 const COMPRESSION_BEAT_MS=60000/METRONOME_BPM;
 const THIRTY_BEATS_MS=30*COMPRESSION_BEAT_MS;
-const BREATH_DURATION_MS=1500; // 1.5-second inspiratory visual cue
-const BREATH_RELEASE_MS=500;
-const TWO_BREATHS_MS=2*BREATH_DURATION_MS+BREATH_RELEASE_MS; // 3.5 s total
+const BREATH_DURATION_MS=1000; // 2025 adult BLS: each breath takes about 1 second.
+const BREATH_RELEASE_MS=750; // Brief release/transition within a 3.5 s coached pause.
+const TWO_BREATHS_MS=2*(BREATH_DURATION_MS+BREATH_RELEASE_MS); // 3.5 s total (estimated)
 const MASK_CYCLE_MS=THIRTY_BEATS_MS+TWO_BREATHS_MS;
 
 document.body.classList.toggle("tv-mode",tvMode);
@@ -151,6 +152,7 @@ function blankState() {
     ecgPending:false, // ECG leads not yet ready; CPR continues until next rhythm check.
     leadsAttached:false, // Becomes true after the first documented ECG rhythm; persists through re-arrest.
     pauseAccruedMs:0,
+    pauseSpans:[],compressionSpans:[],activeCompressionAt:null,
     arrestAccruedMs:0,
     episodeStartAt:null,
     frozenCycleMs:0,
@@ -175,6 +177,51 @@ function line(state,e,label) {
   if(e.type!=="shock" && e.type!=="epi" && e.type!=="reset"){
     state.lastActionAt[actionGroup(e.type,e.value)]=e.ts;
   }
+}
+// Record explicit interruption intervals separately from the estimated 30:2 coach.
+function closeCompression(s,t){
+  if(s.activeCompressionAt!==null && t>s.activeCompressionAt){
+    s.compressionSpans.push({start:s.activeCompressionAt,end:t,anchor:s.coachAnchor,
+      advancedAirway:s.advancedAirway});
+  }
+  s.activeCompressionAt=null;
+}
+function beginCompression(s,t){s.coachAnchor=t;s.activeCompressionAt=t;}
+function closePause(s,t){
+  if(s.pausedAt!==null && t>s.pausedAt){
+    s.pauseSpans.push({start:s.pausedAt,end:t,kind:s.pauseReason||"manual"});
+  }
+}
+function cumulativeCoachedBreaths(ms){
+  const elapsed=Math.max(0,ms);
+  const full=Math.floor(elapsed/MASK_CYCLE_MS);
+  return full*TWO_BREATHS_MS+Math.min(TWO_BREATHS_MS,
+    Math.max(0,elapsed-full*MASK_CYCLE_MS-THIRTY_BEATS_MS));
+}
+function coachedPauseMillis(span){
+  if(span.advancedAirway||span.anchor===null)return 0;
+  return Math.max(0,cumulativeCoachedBreaths(span.end-span.anchor)-
+    cumulativeCoachedBreaths(span.start-span.anchor));
+}
+function coachedBreathSpans(span){
+  if(span.advancedAirway||span.anchor===null)return [];
+  const spans=[];
+  const first=Math.max(0,Math.floor((span.start-span.anchor)/MASK_CYCLE_MS));
+  const last=Math.floor((span.end-span.anchor)/MASK_CYCLE_MS);
+  for(let n=first;n<=last;n++){
+    const start=Math.max(span.start,span.anchor+n*MASK_CYCLE_MS+THIRTY_BEATS_MS);
+    const end=Math.min(span.end,span.anchor+(n+1)*MASK_CYCLE_MS);
+    if(end>start)spans.push({start,end,kind:"ventilation"});
+  }
+  return spans;
+}
+function runningCompressionSpans(s,now){
+  const spans=s.compressionSpans.slice();
+  if(s.phase==="running" && s.activeCompressionAt!==null){
+    spans.push({start:s.activeCompressionAt,end:now,anchor:s.coachAnchor,
+      advancedAirway:s.advancedAirway});
+  }
+  return spans;
 }
 function computeState() {
   const s = blankState();
@@ -218,12 +265,13 @@ function computeState() {
       // Before a dose the TV displays "NO NEED".
       line(s,e,recurrent?"RE-ARREST — START CPR #"+s.episode:"START CPR");
     } else if (e.type === "pause" && s.phase === "running") {
+      closeCompression(s,t);
       // Compression interruption does NOT stop the 2-min cycle or epinephrine clock.
       s.pausedAt=t;
       s.pauseId=e.id;
       // User interruptions inside a two-minute cycle must NOT re-anchor it.
       // The scheduled two-minute check still opens the rhythm selector.
-      s.pauseReason=e.value==="cycle"?"cycle":e.value==="manual"&&s.leadsAttached?"manual":"rhythm";
+      s.pauseReason=e.value==="cycle"?"cycle":e.value==="rhythm"||!s.leadsAttached?"rhythm":"manual";
       s.pauseRhythmRecorded=false;
       if(s.pauseReason!=="manual")s.ecgPending=false;
       s.phase="paused";
@@ -234,6 +282,7 @@ function computeState() {
       !s.pauseRhythmRecorded && !s.shockFlow) {
       // Continue compressions while ECG leads are being attached. The rhythm
       // stays unknown (or the previous confirmed rhythm) until re-assessment.
+      closePause(s,t);
       s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
       s.pausedAt=null;
       s.pauseId=null;
@@ -242,18 +291,19 @@ function computeState() {
       s.phase="running";
       s.ecgPending=true;
       s.cycleAnchor=t;
-      s.coachAnchor=t;
+      beginCompression(s,t);
       line(s,e,"CONTINUE CPR — ECG LEADS NOT READY; CHECK RHYTHM LATER");
     } else if (e.type === "charge" &&
       s.shockFlow==="decision" && ["running","paused"].includes(s.phase)) {
       // Compression continues during charging. Close any earlier rhythm-check pause.
       if(s.phase==="paused" && s.pausedAt!==null){
+        closePause(s,t);
         s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
         s.pausedAt=null;
         s.pauseId=null;
         s.pauseReason=null;
         s.pauseRhythmRecorded=false;
-        s.coachAnchor=t;
+        beginCompression(s,t);
       }
       s.phase="running";
       s.shockFlow="charging";
@@ -262,6 +312,7 @@ function computeState() {
       ["decision","charging"].includes(s.shockFlow) &&
       ["running","paused"].includes(s.phase)) {
       if(s.phase==="running"){
+        closeCompression(s,t);
         s.phase="paused";
         s.pausedAt=t;
         s.pauseId=e.id;
@@ -276,6 +327,7 @@ function computeState() {
       if(s.shockFlow && s.shockFlow!=="postShock")continue;
       if(["cycle","rhythm"].includes(s.pauseReason) && !s.pauseRhythmRecorded)continue;
       const interruption=Math.max(0,t-s.pausedAt);
+      closePause(s,t);
       s.pauseAccruedMs+=interruption;
       if(["cycle","rhythm"].includes(s.pauseReason) || s.shockFlow==="postShock"){
         s.cycleAnchor=t; // Next two-minute cycle begins only after Resume.
@@ -285,11 +337,13 @@ function computeState() {
       s.pauseReason=null;
       s.pauseRhythmRecorded=false;
       s.phase="running";
-      s.coachAnchor=t;
+      beginCompression(s,t);
       s.shockFlow=null;
       s.clearAt=null;
       line(s,e,"RESUME COMPRESSIONS — interruption "+timeText(interruption));
     } else if (e.type === "rosc" && ["running","paused"].includes(s.phase)) {
+      if(s.phase==="running")closeCompression(s,t);
+      else closePause(s,t);
       if (s.pausedAt!==null) s.pauseAccruedMs+=Math.max(0,t-s.pausedAt);
       s.arrestAccruedMs+=Math.max(0,t-s.episodeStartAt);
       s.episodeStartAt=null;
@@ -315,6 +369,7 @@ function computeState() {
         // defibrillator. Compression interruption begins at this tap when
         // charging CPR was running; an existing rhythm-check pause is retained.
         if(s.phase==="running"){
+          closeCompression(s,t);
           s.phase="paused";
           s.pausedAt=t;
           s.pauseId=e.id;
@@ -350,6 +405,7 @@ function computeState() {
       // Old remotes can still broadcast a rhythm without first pressing Pause.
       // Treat the record as the beginning of an interruption until Resume CPR.
       if(s.phase==="running"){
+        closeCompression(s,t);
         s.phase="paused";
         s.pausedAt=t;
         s.pauseId=e.id;
@@ -379,7 +435,9 @@ function computeState() {
       s.lastPeaWidth=e.value;
       line(s,e,"PEA QRS: "+e.value);
     } else if (["running","paused"].includes(s.phase) && e.type === "etTube" && !s.advancedAirway) {
+      if(s.phase==="running")closeCompression(s,t);
       s.advancedAirway=true;
+      if(s.phase==="running")beginCompression(s,t);
       s.ventAnchor=t;
       line(s,e,"ET-TUBE (reported placed) — ventilation coach started");
     } else if (e.type==="adjunct" &&
@@ -427,14 +485,21 @@ function elapsedFor(s,now) {
     s.phase==="paused"?Math.max(0,s.pausedAt-s.ventAnchor):0;
   const arrestMs=s.arrestAccruedMs+
     (active && s.episodeStartAt!==null?Math.max(0,now-s.episodeStartAt):0);
-  const currentPauseMs=s.phase==="paused" && s.pausedAt!==null?
+  const loggedCurrentPauseMs=s.phase==="paused" && s.pausedAt!==null?
     Math.max(0,now-s.pausedAt):0;
-  const pauseMs=Math.min(arrestMs,s.pauseAccruedMs+currentPauseMs);
+  const ventilationPauseMs=runningCompressionSpans(s,now)
+    .reduce((total,span)=>total+coachedPauseMillis(span),0);
+  // Explicit pauses never overlap coached breath intervals: running segments
+  // are closed on pause, shock, rhythm assessment, ROSC and airway changes.
+  const pauseMs=Math.min(arrestMs,s.pauseAccruedMs+loggedCurrentPauseMs+ventilationPauseMs);
+  const coachPosition=s.phase==="running"&&!s.advancedAirway?
+    maskCoach(s,now).position:0;
+  const currentPauseMs=loggedCurrentPauseMs||Math.max(0,coachPosition-THIRTY_BEATS_MS);
   const compressionMs=Math.max(0,arrestMs-pauseMs);
   const ccf=arrestMs>0?(compressionMs/arrestMs)*100:null;
   const pauseRemainingMs=Math.max(0,10000-currentPauseMs);
   return {totalMs,cycleMs,epiMs,ventMs,arrestMs,pauseMs,currentPauseMs,
-    pauseRemainingMs,compressionMs,ccf};
+    pauseRemainingMs,compressionMs,ccf,ventilationPauseMs};
 }
 function timeText(ms) {
   const sec=Math.floor(Math.max(0,ms)/1000);
