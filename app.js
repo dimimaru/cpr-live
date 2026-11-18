@@ -835,7 +835,7 @@ function renderECG(s){
 function renderInterruption(s,clock){
   const paused=s.phase==="paused"&&s.pausedAt!==null;
   const mobile=document.getElementById("pauseInfo");
-  mobile.hidden=!paused;
+  mobile.hidden=true; // Unified Pause/Resume button now carries the countdown.
   if(paused){
     const remaining=Math.max(0,Math.ceil(clock.pauseRemainingMs/1000));
     document.getElementById("pauseCountdown").textContent=String(remaining);
@@ -888,7 +888,7 @@ function renderVentilation(s,clock) {
     const coach=maskCoach(s,paused?s.pausedAt:Date.now());
     number=coach.breath?coach.breath+"/2":coach.count+"/30";
     squeeze=!paused&&coach.squeeze;
-    label=coach.breath?(coach.squeeze?"AMBU • 1.5 s":"RELEASE • 0.5 s"):"COMPRESSIONS";
+    label=coach.breath?(coach.squeeze?"AMBU • 1 s":"RELEASE • 0.75 s"):"COMPRESSIONS";
     mobileLabel=coach.breath?(coach.squeeze?"BREATH "+coach.breath+"/2":"RELEASE"):"COMPRESSIONS";
   }
   if(paused){label=mobileLabel="CPR PAUSED";}
@@ -921,7 +921,8 @@ function recordedMedLabSummary(s){
   const counts=s.adjunctCounts||{};
   const bicarb=(counts.nahco3||0)+(counts.nahco3_1||0)+2*(counts.nahco3_2||0);
   if(bicarb)meds.push("NaHCO₃ "+bicarb+" amp");
-  if(counts.calcium)meds.push("Calcium ×"+counts.calcium);
+  const calciumAmps=(counts.calcium||0)+(counts.calcium_1||0)+2*(counts.calcium_2||0)+3*(counts.calcium_3||0);
+  if(calciumAmps)meds.push("Calcium "+calciumAmps+" amp");
   if(counts.glucose)meds.push("Dextrose 50% ×"+counts.glucose);
   if(counts.lidocaine)meds.push("Lidocaine ×"+counts.lidocaine);
   if(counts.prc)meds.push("PRC "+counts.prc+" unit");
@@ -1027,7 +1028,7 @@ function roscSelectionAvailable(s){
 function renderCauseTools(s){
   if(tvMode)return;
   const active=["running","paused"].includes(s.phase);
-  if(!active){bicarbPickerOpen=false;causeToolsOpen=false;causeTab="pocus";}
+  if(!active){bicarbPickerOpen=false;calciumPickerOpen=false;causeToolsOpen=false;causeTab="pocus";}
   const tool=document.getElementById("nonShockTools");
   tool.hidden=!active; // POCUS, lab and trauma remain available for VF/pVT too.
   document.getElementById("causeToolsPanel").hidden=!active||!causeToolsOpen;
@@ -1062,6 +1063,8 @@ function renderCauseTools(s){
   const picker=document.getElementById("bicarbDosePicker");
   picker.hidden=!active||!bicarbPickerOpen;
   document.getElementById("bicarbToggle").disabled=!connected||!active;
+  document.getElementById("calciumDosePicker").hidden=!active||!calciumPickerOpen;
+  document.getElementById("calciumToggle").disabled=!connected||!active;
 }
 function renderReportDashboard(s,clock){
   if(tvMode||s.phase!=="rosc")return;
@@ -1095,7 +1098,9 @@ function renderReportDashboard(s,clock){
   const records=[];
   const amps=(s.adjunctCounts.nahco3_1||0)+2*(s.adjunctCounts.nahco3_2||0)+(s.adjunctCounts.nahco3||0);
   if(amps)records.push(["7.5% NaHCO₃",amps+" amp"]);
-  for(const [key,label]of [["prc","PRC"],["calcium","Calcium"],["glucose","Glucose"],["lidocaine","Lidocaine"]]){
+  const ca=(s.adjunctCounts.calcium||0)+(s.adjunctCounts.calcium_1||0)+2*(s.adjunctCounts.calcium_2||0)+3*(s.adjunctCounts.calcium_3||0);
+  if(ca)records.push(["10% Calcium",ca+" amp"]);
+  for(const [key,label]of [["prc","PRC"],["glucose","Glucose"],["lidocaine","Lidocaine"]]){
     if(s.adjunctCounts[key])records.push([label,key==="prc"?s.adjunctCounts[key]+" unit":s.adjunctCounts[key]+" records"]);
   }
   const procedures=s.timeline.filter(e=>e.label==="ICD Lt"||e.label==="ICD Rt");
@@ -1199,6 +1204,7 @@ function renderControllerStage(s) {
   document.getElementById("stageDashboardBtn").disabled=stage!=="reArrest";
   document.getElementById("stageDashboardPdfBtn").disabled=stage!=="dashboard";
   document.getElementById("stageDashboardBackBtn").disabled=stage!=="dashboard";
+  if(stage==="rhythm"){causeToolsOpen=false;causeTab="pocus";}
   if(stage==="dashboard")renderReportDashboard(s,elapsedFor(s,Date.now()));
   const rhythmRosc=document.getElementById("stageRoscPromptBtn");
   rhythmRosc.disabled=!connected || stage!=="rhythm";
@@ -1384,19 +1390,27 @@ function render() {
   shockHint.hidden=true; // Single label; no duplicate cooldown below Shock.
   const pauseResume=document.getElementById("pauseResumeBtn");
   const manualPaused=s.phase==="paused" && s.pauseReason==="manual";
+  const firstRhythmPending=s.phase==="running"&&!s.leadsAttached;
   pauseResume.dataset.action=manualPaused?"resume":"pause";
-  pauseResume.dataset.value=manualPaused?"":"manual";
-  pauseResume.textContent=manualPaused?"▶ RESUME CPR · HANDS-ON":"Ⅱ PAUSE CPR · HANDS-OFF";
+  pauseResume.dataset.value=manualPaused?"":firstRhythmPending?"rhythm":"manual";
+  const remaining=Math.max(0,(10000-clock.currentPauseMs)/1000);
+  pauseResume.textContent=manualPaused?
+    "▶ RESUME CPR · "+(remaining>0?remaining.toFixed(1)+" s LEFT":"OVER 10 s")+
+    " · HANDS-OFF "+(clock.currentPauseMs/1000).toFixed(1)+" s":
+    firstRhythmPending?"Ⅱ PAUSE CPR · CHECK RHYTHM":"Ⅱ PAUSE CPR";
   pauseResume.classList.toggle("resume-flash",manualPaused);
-  pauseResume.hidden=!s.leadsAttached || !(s.phase==="running" || manualPaused);
-  pauseResume.disabled=!connected || !s.leadsAttached || !!s.shockFlow ||
+  pauseResume.classList.toggle("pause-overrun",manualPaused&&remaining===0);
+  pauseResume.hidden=!(s.phase==="running" || manualPaused);
+  pauseResume.disabled=!connected || !!s.shockFlow ||
     !(s.phase==="running" || manualPaused) ||
     pendingActions.has(manualPaused?"resume":"pause");
   const metro=document.getElementById("toggleMetronome");
   if(metro){
     metro.classList.toggle("active",s.metronomeOn);
     metro.setAttribute("aria-pressed",String(s.metronomeOn));
-    metro.textContent="🎵 105 BPM "+(s.metronomeOn?"ON":"OFF");
+    metro.textContent=s.metronomeOn?"🔊":"🔇";
+    metro.setAttribute("aria-label","Metronome 105 BPM "+(s.metronomeOn?"on":"off"));
+    metro.title="Metronome 105 BPM "+(s.metronomeOn?"on":"off");
   }
   const medication=nextMedication(s,clock);
   const epiControl=document.getElementById("epiControl");
@@ -1529,8 +1543,7 @@ async function handleAction(type,value) {
   const s=computeState();
   if (type==="start" && !["standby","rosc"].includes(s.phase))return;
   if (type==="display" && (s.phase!=="rosc" || !["dashboard","monitor"].includes(value)))return;
-  if (type==="pause" && (s.phase!=="running" ||
-      (value==="manual" && !s.leadsAttached)))return;
+  if (type==="pause" && s.phase!=="running")return;
   if (type==="leadWait" && !(s.phase==="paused" && !s.leadsAttached &&
       ["cycle","rhythm"].includes(s.pauseReason) && !s.pauseRhythmRecorded && !s.shockFlow))return;
   if (type==="resume" && s.phase!=="paused")return;
@@ -1953,6 +1966,12 @@ if(!tvMode){
     bicarbPickerOpen=!bicarbPickerOpen;
     render();
   });
+  document.getElementById("calciumToggle").addEventListener("click",()=>{
+    const s=computeState();
+    if(!connected||!["running","paused"].includes(s.phase))return;
+    calciumPickerOpen=!calciumPickerOpen;
+    render();
+  });
   document.getElementById("causeToolsToggle").addEventListener("click",()=>{
     const s=computeState();
     if(!connected||!["running","paused"].includes(s.phase))return;
@@ -1979,6 +1998,7 @@ document.querySelectorAll("[data-action]").forEach(btn=>
     }
     // PAUSE CPR must be immediate: confirmation would add avoidable hands-off delay.
     if(action==="adjunct" && btn.dataset.value.startsWith("nahco3_"))bicarbPickerOpen=false;
+    if(action==="adjunct" && btn.dataset.value.startsWith("calcium_"))calciumPickerOpen=false;
     handleAction(action,btn.dataset.value);
   })
 );
