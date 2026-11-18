@@ -1120,6 +1120,90 @@ function renderReportDashboard(s,clock){
     }
   }
 }
+// Build an intervention timeline on the TV report from the SAME event-sourced
+// state used by CPR timing and CCF. The 30:2 breath bands are coach estimates.
+function renderTvActionTimeline(s){
+  if(!tvMode)return;
+  const host=document.getElementById("tvActionTimeline");
+  if(!host||s.firstStartAt===null)return;
+  const signature=s.timeline.map(item=>item.id).join("|");
+  if(host.dataset.signature===signature)return;
+  host.dataset.signature=signature;
+  const start=s.firstStartAt;
+  const roscEvents=s.timeline.filter(item=>item.label.startsWith("ROSC —"));
+  const end=roscEvents.length?roscEvents[roscEvents.length-1].ts:Date.now();
+  const total=Math.max(1000,end-start);
+  const percent=t=>Math.max(0,Math.min(100,(t-start)*100/total));
+  host.replaceChildren();
+  const track=document.createElement("div");
+  track.className="tv-time-track";
+  const stops=[...s.pauseSpans,...s.compressionSpans.flatMap(coachedBreathSpans)]
+    .filter(item=>item.end>start && item.start<end)
+    .sort((a,b)=>a.start-b.start);
+  for(const interval of stops){
+    const left=percent(Math.max(start,interval.start));
+    const right=percent(Math.min(end,interval.end));
+    if(right<=left)continue;
+    const bar=document.createElement("span");
+    bar.className="tv-time-handoff"+
+      (interval.kind==="ventilation"?" tv-time-breath":" tv-time-manual");
+    bar.style.left=left+"%";
+    bar.style.width=(right-left)+"%";
+    const type=interval.kind==="ventilation"?"Coached 30:2 breaths":"Recorded CPR interruption";
+    bar.title=type+" · +"+timeText(interval.start-start)+" to +"+
+      timeText(interval.end-start);
+    track.append(bar);
+  }
+  host.append(track);
+  const events=s.timeline.filter(item=>{
+    const name=item.label;
+    return name.startsWith("RHYTHM: ")||
+      name.startsWith("CLEAR FIRST — SHOCK")||
+      name.startsWith("EPINEPHRINE ")||
+      name.startsWith("AMIODARONE ")||
+      name.startsWith("7.5% NaHCO")||
+      name.startsWith("10% Calcium")||
+      name.startsWith("50% Glucose")||
+      name.startsWith("Lidocaine")||
+      name.startsWith("PRC ·")||
+      name.startsWith("ICD ")||
+      name.startsWith("ROSC —");
+  });
+  // Limit only displayed marker density, not the underlying bands or recorded data.
+  events.slice(-48).forEach((entry,index)=>{
+    const title=entry.label;
+    const icon=title.startsWith("CLEAR FIRST")?"⚡":
+      title.startsWith("RHYTHM")?"♥":
+      title.startsWith("ROSC")?"✓":
+      title.startsWith("ICD")?"✚":"💉";
+    const marker=document.createElement("span");
+    marker.className="tv-time-marker tv-time-marker-"+(index%2);
+    marker.textContent=icon;
+    marker.style.left=percent(entry.ts)+"%";
+    marker.style.animationDelay=Math.min(0.8,percent(entry.ts)/125).toFixed(2)+"s";
+    marker.title="+"+timeText(entry.ts-start)+" · "+title;
+    marker.setAttribute("aria-label",marker.title);
+    host.append(marker);
+  });
+  const scale=document.createElement("div");
+  scale.className="tv-time-axis";
+  for(let i=0;i<=4;i++){
+    const tick=document.createElement("span");
+    tick.textContent=timeText(total*i/4);
+    scale.append(tick);
+  }
+  host.append(scale);
+  const details=document.getElementById("tvTimelineEvents");
+  if(details){
+    details.replaceChildren();
+    for(const item of events.slice(-6).reverse()){
+      const line=document.createElement("span");
+      line.textContent="+"+timeText(item.ts-start)+" · "+item.label;
+      details.append(line);
+    }
+  }
+}
+
 function renderTvReportDashboard(s,clock){
   if(!tvMode)return;
   const active=s.phase==="rosc" && !!s.tvDashboard;
@@ -1172,6 +1256,7 @@ function renderTvReportDashboard(s,clock){
   const procedures=Object.entries(s.procedures)
     .filter(([,checked])=>!!checked).map(([key])=>PROCEDURE_NAMES[key]||key);
   put("tvDashProcedures",procedures.join(" · ")||"—");
+  renderTvActionTimeline(s);
 }
 function renderControllerStage(s) {
   if(tvMode)return;
