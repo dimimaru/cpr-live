@@ -586,8 +586,9 @@ function maskCoach(s,now){
     return {round,position,breath:0,count:Math.min(30,Math.floor(position/COMPRESSION_BEAT_MS)+1),squeeze:false};
   }
   const b=position-THIRTY_BEATS_MS;
-  return {round,position,breath:b<BREATH_DURATION_MS+BREATH_RELEASE_MS?1:2,
-    count:30,squeeze:b<BREATH_DURATION_MS||b>=BREATH_DURATION_MS+BREATH_RELEASE_MS};
+  const breathInterval=BREATH_DURATION_MS+BREATH_RELEASE_MS;
+  return {round,position,breath:b<breathInterval?1:2,
+    count:30,squeeze:(b%breathInterval)<BREATH_DURATION_MS};
 }
 function epiColor(s,clock){
   if(!["running","paused"].includes(s.phase))return "neutral";
