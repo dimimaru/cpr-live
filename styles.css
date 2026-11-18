@@ -2009,3 +2009,122 @@ body:not(.tv-mode) .remote-secondary #pauseResumeBtn{
     min-height:clamp(28px,6vh,52px);
   }
 }
+
+
+/* V2.3 — consolidated Remote hand-off, links and dynamic TV event timeline. */
+body:not(.tv-mode) .metronome-button.icon-only-sound{
+  display:grid;place-items:center;flex:0 0 45px;
+  width:45px;height:45px;min-width:45px;padding:0;
+  font-size:25px;line-height:1;border-radius:12px
+}
+body:not(.tv-mode) .remote-secondary #pauseResumeBtn{
+  width:100%;min-height:75px;font-size:clamp(15px,3.6vw,22px);
+  font-weight:900;line-height:1.25;white-space:normal;
+  overflow-wrap:anywhere;padding:12px 9px;
+}
+body:not(.tv-mode) .remote-secondary #pauseResumeBtn.pause-overrun{
+  background:#902a3b;border-color:#ff6577;color:#fff;
+}
+body:not(.tv-mode) #pauseInfo{display:none!important}
+body:not(.tv-mode) .footer{
+  display:flex;flex-direction:column;align-items:stretch;gap:6px
+}
+body:not(.tv-mode) .footer .footer-links{
+  display:grid;width:100%;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;margin:4px 0 0;
+}
+body:not(.tv-mode) .footer .footer-links button{
+  min-height:47px;font-size:clamp(11px,2.7vw,15px);
+}
+body:not(.tv-mode).remote-stage-reArrest .footer{display:flex!important}
+@media(max-width:420px){
+  body:not(.tv-mode) .footer .footer-links{grid-template-columns:1fr}
+}
+body.tv-mode .tv-event-timeline{
+  flex:0 0 clamp(110px,17vh,156px);
+  min-height:100px;min-width:0;max-width:100%;
+  display:flex;flex-direction:column;gap:3px;
+  padding:clamp(7px,.8vw,12px);
+  border:1px solid #365b78;border-radius:12px;
+  background:linear-gradient(130deg,#132a3e,#0c1f30);
+  overflow:hidden
+}
+body.tv-mode .tv-event-timeline-heading{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;flex:0 0 auto;min-width:0
+}
+body.tv-mode .tv-event-timeline-heading strong{
+  color:#e0f5ff;font-weight:900;letter-spacing:.05em;
+  font-size:clamp(11px,1vw,16px);white-space:nowrap
+}
+body.tv-mode .tv-event-timeline-heading>span{
+  color:#9ec6db;font-size:clamp(8px,.68vw,11px);
+  line-height:1.2;text-align:right
+}
+body.tv-mode .legend-swatch{display:inline-block;width:12px;height:8px;border-radius:3px}
+body.tv-mode .legend-swatch.logged{background:#fa4960}
+body.tv-mode .legend-swatch.coached{background:#b95c62}
+body.tv-mode .tv-timeline-visual{
+  position:relative;flex:1 1 auto;min-height:54px;
+  margin:0 8px;overflow:visible
+}
+body.tv-mode .tv-time-track{
+  position:absolute;left:0;right:0;top:40%;height:16px;
+  border-radius:7px;border:1px solid #386d7e;
+  background:linear-gradient(90deg,#1d685e,#225d6f);
+  box-shadow:inset 0 1px 4px #102b3e;
+}
+body.tv-mode .tv-time-handoff{
+  display:block;position:absolute;top:0;bottom:0;
+  min-width:2px;background:#fa4960;
+  border-left:1px solid #ffd0d8;border-right:1px solid #ffd0d8;
+  box-shadow:0 0 7px #ed456044;
+  transform-origin:left center;
+  animation:tv-timeline-grow .6s ease both;
+}
+body.tv-mode .tv-time-handoff.tv-time-breath{
+  background:repeating-linear-gradient(135deg,#a63e50,#a63e50 3px,#e27276 3px,#e27276 6px);
+  border-color:#e9afb2;box-shadow:none
+}
+body.tv-mode .tv-time-marker{
+  position:absolute;z-index:2;
+  transform:translateX(-50%);display:grid;place-items:center;
+  width:23px;height:23px;border-radius:50%;
+  background:#19394f;border:1px solid #7db8d2;
+  font-size:15px;font-weight:900;color:#fff;
+  box-shadow:0 2px 7px #07111bd9;
+  animation:tv-timeline-pop .3s ease both;
+}
+body.tv-mode .tv-time-marker-0{top:0}
+body.tv-mode .tv-time-marker-1{top:50%}
+body.tv-mode .tv-time-axis{
+  position:absolute;left:0;right:0;bottom:0;
+  display:flex;justify-content:space-between;
+  color:#87a8be;font-size:clamp(8px,.7vw,12px);
+  font-variant-numeric:tabular-nums;font-weight:800;
+}
+body.tv-mode .tv-timeline-recent{
+  flex:0 0 auto;display:flex;align-items:center;gap:13px;
+  font-size:clamp(8px,.68vw,11px);color:#b4dce7;
+  white-space:nowrap;overflow:hidden
+}
+body.tv-mode .tv-timeline-recent span{
+  flex:0 0 auto;max-width:30%;overflow:hidden;text-overflow:ellipsis
+}
+@keyframes tv-timeline-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes tv-timeline-pop{from{opacity:0;scale:.4}to{opacity:1;scale:1}}
+@media(max-height:650px) and (min-aspect-ratio:1/1){
+  body.tv-mode .tv-event-timeline{flex-basis:93px;min-height:85px;padding:5px}
+  body.tv-mode .tv-timeline-visual{min-height:38px}
+  body.tv-mode .tv-time-track{height:12px}
+  body.tv-mode .tv-time-marker{width:17px;height:17px;font-size:11px}
+  body.tv-mode .tv-event-timeline-heading strong{font-size:10px}
+}
+@media(max-aspect-ratio:1/1){
+  body.tv-mode .tv-event-timeline{flex-basis:auto;min-height:140px}
+  body.tv-mode .tv-timeline-visual{min-height:75px}
+  body.tv-mode .tv-timeline-recent{flex-wrap:wrap;white-space:normal}
+}
+@media(prefers-reduced-motion:reduce){
+  body.tv-mode .tv-time-handoff,body.tv-mode .tv-time-marker{animation:none}
+}
