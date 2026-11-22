@@ -12,24 +12,16 @@
   <link rel="apple-touch-icon" sizes="180x180" href="./assets/cpr-remote-180.png">
   <link rel="icon" sizes="192x192" type="image/png" href="./assets/cpr-remote-192.png">
   <link rel="icon" type="image/svg+xml" href="./assets/cpr-remote.svg">
-  <link rel="stylesheet" href="./styles.css?v=2.4.1">
+  <link rel="stylesheet" href="./styles.css?v=2.4.2">
 </head>
 <body class="remote-stage-start">
   <div class="app">
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v2.4.1</small></div>
-      </div>
-      <div class="head-right">
-        <span id="modeBadge" class="mode-badge">CONTROLLER</span>
-        <span id="connectionStatus" class="connection off">● DISCONNECTED</span>
-      </div>
-    </header>
-    <div class="remote-top-tools" aria-label="Remote controls">
+    <header class="topbar compact-remote-header">
+      <span id="modeBadge" class="mode-badge">CONTROLLER</span>
+      <small class="remote-version">v2.4.2</small>
+      <span id="connectionStatus" class="connection off">● DISCONNECTED</span>
       <button id="toggleMetronome" class="small-control metronome-button active icon-only-sound" data-action="metro" aria-label="Metronome 105 BPM on" title="Metronome 105 BPM on" aria-pressed="true">🔊</button>
-      <button id="resetBtn" class="small-control danger-control" data-action="reset">↺ RESET</button>
-    </div>
+    </header>
 
     <div id="setupNotice" class="notice" hidden>
       <strong>ยังไม่ได้เชื่อม Supabase</strong>
@@ -266,8 +258,7 @@
             <button id="stageResumeBtn" type="button" data-action="resume" class="action remote-stage-resume-button">▶ RESUME CPR</button>
           </div>
         </div>
-        <div class="section-title"><h2>CPR REMOTE</h2></div>
-        <div class="quick-status"><strong data-bind="phase">STANDBY</strong><span>CPR <b data-bind="cycle">02:00</b></span><span>ยา <b data-bind="epiTime">00:00</b></span><span>CO₂ <b data-bind="etco2">—</b></span><span>SHOCK <b data-bind="shock">0</b></span><span class="quick-rhythm" data-bind="rhythm">—</span></div>
+        <div class="quick-status compact-quick-status"><span>CPR <b data-bind="cycle">02:00</b></span><span aria-label="EtCO₂">🫁 <b data-bind="etco2">—</b></span><span aria-label="Shock count">⚡ <b data-bind="shock">0</b></span><span class="quick-rhythm" data-bind="shortRhythm">—</span></div>
         <div id="rhythmWarning" class="rhythm-warning" hidden>⚠️ เริ่ม CPR แล้ว — กรุณาบันทึก Rhythm (เวลาเดินต่อได้)</div>
         <div id="peaWidthPicker" class="pea-width-picker" hidden>
           <strong>PEA QRS COMPLEX — เลือกความกว้าง</strong>
@@ -300,9 +291,9 @@
             <form id="tubeDetailsForm" class="tube-details" hidden>
               <div class="tube-grid">
                 <label for="tubeSize">Tube size (mm ID)</label>
-                <input id="tubeSize" type="number" min="2" max="10" step="0.5" inputmode="decimal" placeholder="mm" required>
+                <span class="inline-number"><input id="tubeSize" type="number" min="6" max="8.5" step="0.5" value="7" inputmode="decimal" required><span class="number-arrows"><button type="button" data-tube-step="up" data-input="tubeSize" aria-label="Increase tube size">▲</button><button type="button" data-tube-step="down" data-input="tubeSize" aria-label="Decrease tube size">▼</button></span></span>
                 <label for="tubeDepth">Depth (cm at lip)</label>
-                <input id="tubeDepth" type="number" min="0.5" max="40" step="0.5" inputmode="decimal" placeholder="cm" required>
+                <span class="inline-number"><input id="tubeDepth" type="number" min="18" max="28" step="1" value="20" inputmode="numeric" required><span class="number-arrows"><button type="button" data-tube-step="up" data-input="tubeDepth" aria-label="Increase depth">▲</button><button type="button" data-tube-step="down" data-input="tubeDepth" aria-label="Decrease depth">▼</button></span></span>
               </div>
               <button id="tubeDetailsSave" type="submit">SAVE ETT</button>
             </form>
@@ -343,6 +334,13 @@
             </div>
           </div>
         </div>
+        <div id="airwayUpdates" class="airway-updates" hidden>
+          <div class="airway-update-buttons">
+            <button type="button" id="updateTubeBtn" hidden>↕ เลื่อน TUBE</button>
+            <button type="button" id="updateCo2Btn" hidden>🫁 UPDATE CO₂</button>
+          </div>
+          <div id="airwayUpdateFields" class="airway-update-fields"></div>
+        </div>
         <div id="nonShockTools" class="reversible-tools" hidden>
           <button type="button" id="causeToolsToggle" class="reversible-toggle">REVERSIBLE CAUSES ＋</button>
           <div id="causeToolsPanel" class="reversible-panel" hidden>
@@ -382,13 +380,13 @@
         <div id="roscChecklistMobile" class="rosc-checklist mobile" hidden><strong>POST-ROSC CHECKLIST</strong>
           <span>12-lead ECG · CXR · วัด V/S: BP, HR, RR, SpO₂, Temp · ประเมิน GCS · ตรวจ Airway / Oxygenation / Perfusion</span></div>
         <p id="drugHint" class="drug-hint">เริ่ม CPR แล้วเลือกระบุ Rhythm</p>
-        <p class="helper">DEMO ONLY • ไม่มีการยืนยันข้อมูลผู้ป่วยหรือการรับประกันการแจ้งเตือน</p>
+
       </section>
 
       <section class="timeline-section" id="timelineSection">
         <div class="section-title timeline-header">
           <div><h2>Live Timeline</h2><span>บันทึกชั่วคราวบน Controller เท่านั้น</span></div>
-          <button id="exportPdfBtn" class="export-pdf-button" type="button">📄 REPORT PDF</button>
+          <div class="timeline-actions"><button id="resetBtn" class="small-control danger-control" data-action="reset">↺ RESET</button><button id="exportPdfBtn" class="export-pdf-button" type="button">📄 REPORT PDF</button></div>
         </div>
         <p class="report-instructions">PDF จะมีช่องว่างสำหรับติดสติกเกอร์ Patient Label บนกระดาษ A4 — ไม่ต้องกรอกข้อมูลผู้ป่วยลงเว็บไซต์</p>
         <ol id="timeline" class="timeline"><li class="empty">ยังไม่มีเหตุการณ์</li></ol>
@@ -396,7 +394,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V2.4.1 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V2.4.2 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
       <div class="link-grid footer-links">
         <button id="copyTvLink" class="link-btn">📺 แชร์ลิงก์ TV Display</button>
@@ -405,6 +403,6 @@
     </footer>
   </div>
   <script src="./config.js"></script>
-  <script type="module" src="./app.js?v=2.4.1"></script>
+  <script type="module" src="./app.js?v=2.4.2"></script>
 </body>
 </html>
