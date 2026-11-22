@@ -12,14 +12,14 @@
   <link rel="apple-touch-icon" sizes="180x180" href="./assets/cpr-remote-180.png">
   <link rel="icon" sizes="192x192" type="image/png" href="./assets/cpr-remote-192.png">
   <link rel="icon" type="image/svg+xml" href="./assets/cpr-remote.svg">
-  <link rel="stylesheet" href="./styles.css?v=2.4.0">
+  <link rel="stylesheet" href="./styles.css?v=2.4.1">
 </head>
 <body class="remote-stage-start">
   <div class="app">
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v2.4</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v2.4.1</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -129,6 +129,7 @@
             </span>
             <div class="vent-time"><strong data-bind="ventTime">6</strong><span id="ventLabel">NEXT BREATH IN</span></div>
           </div>
+          <small id="ventTubeDetails" class="vent-tube-details" hidden></small>
         </div>
               </div>
             </div>
@@ -297,12 +298,13 @@
           <div id="airwayAction" class="airway-action">
             <button id="etTubeBtn" data-action="etTube" class="action airway">🫁 ET-TUBE</button>
             <form id="tubeDetailsForm" class="tube-details" hidden>
-              <div id="tubeDetailsStatus" class="cause-heading">Size / depth not recorded</div>
               <div class="tube-grid">
-                <label>Size (mm ID)<span class="tube-step-row"><button type="button" data-tube-step="down" data-input="tubeSize" aria-label="Decrease size">−</button><input id="tubeSize" type="number" min="2" max="10" step="0.5" inputmode="decimal" placeholder="mm" required><button type="button" data-tube-step="up" data-input="tubeSize" aria-label="Increase size">＋</button></span></label>
-                <label>Depth (cm at lip)<span class="tube-step-row"><button type="button" data-tube-step="down" data-input="tubeDepth" aria-label="Decrease depth">−</button><input id="tubeDepth" type="number" min="0.5" max="40" step="0.5" inputmode="decimal" placeholder="cm" required><button type="button" data-tube-step="up" data-input="tubeDepth" aria-label="Increase depth">＋</button></span></label>
+                <label for="tubeSize">Tube size (mm ID)</label>
+                <input id="tubeSize" type="number" min="2" max="10" step="0.5" inputmode="decimal" placeholder="mm" required>
+                <label for="tubeDepth">Depth (cm at lip)</label>
+                <input id="tubeDepth" type="number" min="0.5" max="40" step="0.5" inputmode="decimal" placeholder="cm" required>
               </div>
-              <button id="tubeDetailsSave" type="submit">SAVE TUBE DETAILS</button>
+              <button id="tubeDetailsSave" type="submit">SAVE ETT</button>
             </form>
             <form id="etco2Form" class="etco2-form" hidden>
               <label for="etco2Input">EtCO₂ (mmHg)</label>
@@ -394,7 +396,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V2.4 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V2.4.1 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
       <div class="link-grid footer-links">
         <button id="copyTvLink" class="link-btn">📺 แชร์ลิงก์ TV Display</button>
@@ -403,6 +405,6 @@
     </footer>
   </div>
   <script src="./config.js"></script>
-  <script type="module" src="./app.js?v=2.4.0"></script>
+  <script type="module" src="./app.js?v=2.4.1"></script>
 </body>
 </html>
