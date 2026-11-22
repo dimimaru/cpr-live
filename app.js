@@ -1,4 +1,4 @@
-// CPR Live v2.4.1 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v2.4.2 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -105,6 +105,7 @@ let dashboardOpen=false;
 let causeToolsOpen=false;
 let causeTab="pocus";
 let causeDraft={},causeDraftKey="";
+let airwayEdit=null,airwaySessionKey="";
 const CAUSE_ITEMS={
  "us:tamponade":["Pericardium","♥",["Pericardial effusion","Tamponade concern"]],
  "us:lv":["LV function","♥",["Severely reduced contraction","No visible cardiac motion"]],
@@ -136,6 +137,7 @@ function validCauseBatch(value){
  });
 }
 function validTubeDetails(v){return v && typeof v==="object" && Number.isFinite(v.size)&&v.size>=2&&v.size<=10&&Number.isFinite(v.depth)&&v.depth>0&&v.depth<=40;}
+function validAdultTubeInput(v){return validTubeDetails(v)&&v.size>=6&&v.size<=8.5&&Number.isInteger(v.size*2)&&v.depth>=18&&v.depth<=28&&Number.isInteger(v.depth);}
 function causeLabel(k,v){
  if(k==="pea:mode")return v.status===0?"PEA assessment cleared":v.detail==="pseudo"?"Possible pseudo-PEA (cardiac motion)":"Possible true PEA (no visible motion)";
  const item=CAUSE_ITEMS[k];return (k.startsWith("fast:")?"E-FAST ":k.startsWith("lab:")?"LAB ":"US ")+item[0]+": "+(["Not assessed","Negative / normal","Positive / abnormal"][v.status])+(v.detail?" — "+v.detail:"");
@@ -1056,17 +1058,40 @@ function renderEtco2Prompt(s) {
 function renderAirwayAndRhythm(s) {
   const active=["running","paused"].includes(s.phase);
   document.getElementById("etTubeBtn").hidden=s.advancedAirway;
-  document.getElementById("etco2Form").hidden=!s.advancedAirway;
+  const co2Form=document.getElementById("etco2Form");
   const tubeForm=document.getElementById("tubeDetailsForm");
   if(tubeForm){
-    tubeForm.hidden=!s.advancedAirway||!active||!!s.tubeDetails;
     const key=room+"|"+s.sessionId;
-    if(tubeForm.dataset.session!==key){tubeForm.reset();tubeForm.dataset.session=key;}
+    if(airwaySessionKey!==key){airwaySessionKey=key;airwayEdit=null;tubeForm.reset();co2Form.reset();}
+    if(!active)airwayEdit=null;
     const airway=document.getElementById("airwayAction");
-    airway.classList.toggle("split-airway",!tubeForm.hidden);
+    const updates=document.getElementById("airwayUpdates");
+    const fields=document.getElementById("airwayUpdateFields");
+    const tubeRecorded=!!s.tubeDetails,co2Recorded=s.etco2!==null;
+    const tubeInitial=active&&s.advancedAirway&&!tubeRecorded;
+    const co2Initial=active&&s.advancedAirway&&!co2Recorded;
+    const tubeParent=tubeRecorded?fields:airway,co2Parent=co2Recorded?fields:airway;
+    if(tubeForm.parentElement!==tubeParent)tubeParent.append(tubeForm);
+    if(co2Form.parentElement!==co2Parent)co2Parent.append(co2Form);
+    tubeForm.hidden=!(tubeInitial||(active&&tubeRecorded&&airwayEdit==="tube"));
+    co2Form.hidden=!(co2Initial||(active&&co2Recorded&&airwayEdit==="co2"));
+    airway.hidden=s.advancedAirway&&!tubeInitial&&!co2Initial;
+    airway.classList.toggle("split-airway",tubeInitial&&co2Initial);
     airway.classList.toggle("airway-placed",s.advancedAirway);
+    updates.hidden=!active||!s.advancedAirway||(!tubeRecorded&&!co2Recorded);
+    const tubeBtn=document.getElementById("updateTubeBtn"),co2Btn=document.getElementById("updateCo2Btn");
+    tubeBtn.hidden=!tubeRecorded;co2Btn.hidden=!co2Recorded;
+    tubeBtn.textContent=airwayEdit==="tube"?"✕ เลื่อน TUBE":"↕ เลื่อน TUBE";
+    co2Btn.textContent=airwayEdit==="co2"?"✕ UPDATE CO₂":"🫁 UPDATE CO₂";
+    tubeBtn.disabled=!connected||pendingActions.has("tubeDetails");
+    co2Btn.disabled=!connected||pendingActions.has("etco2");
     document.getElementById("tubeDetailsSave").disabled=!connected||pendingActions.has("tubeDetails");
-  }
+    document.querySelectorAll("[data-tube-step]").forEach(btn=>{
+      const input=document.getElementById(btn.dataset.input),n=input.valueAsNumber;
+      const atLimit=Number.isFinite(n)&&(btn.dataset.tubeStep==="up"?n>=Number(input.max):n<=Number(input.min));
+      btn.disabled=!connected||pendingActions.has("tubeDetails")||atLimit;
+    });
+  }else co2Form.hidden=!s.advancedAirway;
   document.getElementById("peaWidthPicker").hidden=!(active && s.rhythm==="PEA");
   document.getElementById("rhythmWarning").hidden=!(active && s.rhythm==="—");
   document.querySelectorAll(".rhythm-button").forEach(btn=>
@@ -1384,7 +1409,7 @@ function renderControllerStage(s) {
   document.getElementById("stageDashboardBtn").disabled=stage!=="reArrest";
   document.getElementById("stageDashboardPdfBtn").disabled=stage!=="dashboard";
   document.getElementById("stageDashboardBackBtn").disabled=stage!=="dashboard";
-  if(stage!=="normal"){causeToolsOpen=false;}
+  if(stage!=="normal"){causeToolsOpen=false;airwayEdit=null;}
   if(stage==="dashboard")renderReportDashboard(s,elapsedFor(s,Date.now()));
   const rhythmRosc=document.getElementById("stageRoscPromptBtn");
   rhythmRosc.disabled=!connected || stage!=="rhythm";
@@ -1477,6 +1502,7 @@ function render() {
       clock.epiMs>=280000?"EPINEPHRINE DUE SOON / DUE":
       clock.epiMs>=240000?"4 MIN • READY":"SINCE LAST DOSE",
     shock:s.shock,epi:s.epi,rhythm:s.ecgPending&&s.rhythm==="—"?"ECG LEADS PENDING":s.rhythm==="PEA"&&s.peaWidth?"PEA / "+s.peaWidth.toUpperCase():s.rhythm==="VT"?"pVT":s.rhythm,etco2:s.etco2===null?"—":s.etco2,
+    shortRhythm:s.rhythm==="Asystole"?"ASYSTOLE":s.rhythm,
     episode:s.episode,ccf:clock.ccf===null?"—":clock.ccf.toFixed(1)+"%",
     pauseCurrent:s.phase==="rosc" || s.phase==="standby"?"—":(clock.currentPauseMs/1000).toFixed(1)+" s",
     pauseTotal:timeText(clock.pauseMs),room
@@ -1784,6 +1810,7 @@ async function handleAction(type,value) {
     if(type==="causeBatch"&&submittedDraftKey===causeDraftKey&&computeState().timeline.some(x=>x.id===e.id)){
       for(const [k,v] of Object.entries(value))if(JSON.stringify(causeDraft[k])===JSON.stringify(v))delete causeDraft[k];
     }
+    if(["tubeDetails","etco2"].includes(type)&&computeState().timeline.some(x=>x.id===e.id))airwayEdit=null;
     if(type==="peaWidth"){
       causeToolsOpen=true;
       causeTab=value==="Wide"?"lab":"pocus";
@@ -2185,9 +2212,31 @@ if(!tvMode){
   document.getElementById("tubeDetailsForm").addEventListener("submit",e=>{
     e.preventDefault();
     const size=document.getElementById("tubeSize").valueAsNumber,depth=document.getElementById("tubeDepth").valueAsNumber;
-    if(validTubeDetails({size,depth}))void handleAction("tubeDetails",{size,depth});
+    if(validAdultTubeInput({size,depth}))void handleAction("tubeDetails",{size,depth});
   });
 
+  document.querySelectorAll("[data-tube-step]").forEach(btn=>btn.addEventListener("click",()=>{
+    const input=document.getElementById(btn.dataset.input);
+    const step=Number(input.step),min=Number(input.min),max=Number(input.max);
+    const current=Number.isFinite(input.valueAsNumber)?input.valueAsNumber:Number(input.defaultValue);
+    const next=Math.min(max,Math.max(min,Math.round((current+(btn.dataset.tubeStep==="up"?step:-step))/step)*step));
+    input.value=String(next);render();
+  }));
+  document.getElementById("updateTubeBtn").addEventListener("click",()=>{
+    const s=computeState();if(!s.tubeDetails||!connected)return;
+    airwayEdit=airwayEdit==="tube"?null:"tube";
+    if(airwayEdit==="tube"){
+      document.getElementById("tubeSize").value=String(s.tubeDetails.size);
+      document.getElementById("tubeDepth").value=String(s.tubeDetails.depth);
+    }
+    render();
+  });
+  document.getElementById("updateCo2Btn").addEventListener("click",()=>{
+    const s=computeState();if(s.etco2===null||!connected)return;
+    airwayEdit=airwayEdit==="co2"?null:"co2";
+    if(airwayEdit==="co2")document.getElementById("etco2Input").value=String(s.etco2);
+    render();
+  });
   document.getElementById("causeToolsToggle").addEventListener("click",()=>{
     const s=computeState();
     if(!connected||!["running","paused"].includes(s.phase))return;
