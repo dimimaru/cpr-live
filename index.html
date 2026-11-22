@@ -12,14 +12,14 @@
   <link rel="apple-touch-icon" sizes="180x180" href="./assets/cpr-remote-180.png">
   <link rel="icon" sizes="192x192" type="image/png" href="./assets/cpr-remote-192.png">
   <link rel="icon" type="image/svg+xml" href="./assets/cpr-remote.svg">
-  <link rel="stylesheet" href="./styles.css?v=2.2.1">
+  <link rel="stylesheet" href="./styles.css?v=2.4.0">
 </head>
 <body class="remote-stage-start">
   <div class="app">
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">♥</span>
-        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v2.3</small></div>
+        <div><strong>CPR LIVE</strong><small>Realtime Screen Sync · Demo v2.4</small></div>
       </div>
       <div class="head-right">
         <span id="modeBadge" class="mode-badge">CONTROLLER</span>
@@ -102,7 +102,7 @@
               <span>LAB / MED</span>
               <div id="rhythmMedLabSummary" class="rhythm-record-summary">
                 <div id="rhythmOtherMedsRow" class="rhythm-record-row"><span>MEDICATIONS</span><strong id="rhythmOtherMedsValue">—</strong></div>
-                <div id="rhythmLabsRow" class="rhythm-record-row"><span>LAB CHECKED</span><strong id="rhythmLabsValue">—</strong></div>
+                <div id="rhythmLabsRow" class="rhythm-record-row"><span>LAB RECORDS</span><strong id="rhythmLabsValue">—</strong></div>
               </div>
             </div>
             <div class="stat etco2-stat" id="co2Stat">
@@ -296,6 +296,14 @@
           </div>
           <div id="airwayAction" class="airway-action">
             <button id="etTubeBtn" data-action="etTube" class="action airway">🫁 ET-TUBE</button>
+            <form id="tubeDetailsForm" class="tube-details" hidden>
+              <div id="tubeDetailsStatus" class="cause-heading">Size / depth not recorded</div>
+              <div class="tube-grid">
+                <label>Size (mm ID)<span class="tube-step-row"><button type="button" data-tube-step="down" data-input="tubeSize" aria-label="Decrease size">−</button><input id="tubeSize" type="number" min="2" max="10" step="0.5" inputmode="decimal" placeholder="mm" required><button type="button" data-tube-step="up" data-input="tubeSize" aria-label="Increase size">＋</button></span></label>
+                <label>Depth (cm at lip)<span class="tube-step-row"><button type="button" data-tube-step="down" data-input="tubeDepth" aria-label="Decrease depth">−</button><input id="tubeDepth" type="number" min="0.5" max="40" step="0.5" inputmode="decimal" placeholder="cm" required><button type="button" data-tube-step="up" data-input="tubeDepth" aria-label="Increase depth">＋</button></span></label>
+              </div>
+              <button id="tubeDetailsSave" type="submit">SAVE TUBE DETAILS</button>
+            </form>
             <form id="etco2Form" class="etco2-form" hidden>
               <label for="etco2Input">EtCO₂ (mmHg)</label>
               <div class="etco2-input-row">
@@ -334,68 +342,32 @@
           </div>
         </div>
         <div id="nonShockTools" class="reversible-tools" hidden>
-          <button type="button" id="causeToolsToggle" class="reversible-toggle">🔎 POCUS / REVERSIBLE CAUSES · ALL RHYTHMS <span>＋</span></button>
+          <button type="button" id="causeToolsToggle" class="reversible-toggle">REVERSIBLE CAUSES ＋</button>
           <div id="causeToolsPanel" class="reversible-panel" hidden>
+            <div class="cause-save-row"><span id="causeUnsaved" role="status">No unsaved findings</span><button type="button" id="causeSave" aria-label="Save findings" title="Save findings"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z"/><path d="M7 3v6h10V3M7 21v-8h10v8"/></svg></button></div>
             <div id="qrsInvestigations" class="qrs-investigations" hidden>
-              <div id="qrsNarrowChecklist" class="qrs-checklist" hidden>
-                <div class="cause-heading">NARROW QRS · TAP ONLY IF FINDING IS DOCUMENTED</div>
-                <button class="cause-check" type="button" data-action="finding" data-value="us:tamponade">Positive POCUS · pericardial fluid / tamponade concern</button>
-                <button class="cause-check" type="button" data-action="finding" data-value="us:hypovolemia">Positive POCUS · hypovolemia pattern</button>
-                <button class="cause-check" type="button" data-action="finding" data-value="us:ptx_lt">Positive lung US · suspected PTX Lt</button>
-                <button class="cause-check" type="button" data-action="finding" data-value="us:ptx_rt">Positive lung US · suspected PTX Rt</button>
-                <button class="cause-check" type="button" data-action="finding" data-value="us:rv_strain">Positive POCUS · RV strain (not diagnostic of PE)</button>
-                <button class="cause-check" type="button" data-action="finding" data-value="qrs:n:airway">Dynamic hyperinflation / airway assessed</button>
-              </div>
-              <div id="qrsWideChecklist" class="qrs-checklist" hidden>
-                <div class="cause-heading">WIDE QRS · TAP ONLY WHEN INVESTIGATION WAS CHECKED</div>
-                <button class="cause-check" type="button" data-action="finding" data-value="lab:k">Potassium (K⁺) checked</button>
-                <button class="cause-check" type="button" data-action="finding" data-value="lab:gas">VBG/ABG · acid-base status checked</button>
-                <button class="cause-check" type="button" data-action="finding" data-value="lab:temp">Core temperature checked</button>
-                <button class="cause-check" type="button" data-action="finding" data-value="qrs:w:tox">Na-channel blocker toxicity reviewed</button>
-                <button class="cause-check" type="button" data-action="finding" data-value="qrs:w:cardiac">Ischemia / pump failure considered</button>
-              </div>
-              <p class="cause-disclaimer">Selecting Narrow/Wide only shows possible causes. Checking a POCUS/LAB finding here also checks the same item in the POCUS/LAB tab. Do not mark an investigation or positive finding unless documented.</p>
+              <p id="qrsNarrowChecklist" class="cause-disclaimer" hidden>Narrow QRS: evaluate structural / obstructive causes, volume and airway.</p>
+              <p id="qrsWideChecklist" class="cause-disclaimer" hidden>Wide QRS: evaluate metabolic causes, temperature, toxicity and ischemia.</p>
             </div>
-            <div class="cause-tabs">
-              <button type="button" data-cause-tab="pocus" class="selected">POCUS</button>
-              <button type="button" data-cause-tab="lab">LAB</button>
-              <button type="button" data-cause-tab="trauma">TRAUMA</button>
-            </div>
+            <div class="cause-tabs"><button type="button" data-cause-tab="pocus" class="selected">ULTRASOUND</button><button type="button" data-cause-tab="lab">LAB</button><button type="button" data-cause-tab="trauma">TRAUMA</button></div>
+            <div class="cause-legend">Gray: not assessed · Green: negative / normal · Red: positive / abnormal</div>
             <div class="cause-pane" data-cause-pane="pocus">
-              <div class="cause-heading">PEA · FUNCTIONAL ASSESSMENT (PEA ONLY)</div>
-              <button class="cause-check" type="button" data-action="finding" data-value="pea:pseudo">Cardiac motion · possible pseudo-PEA</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="pea:true">No visible motion · possible true PEA</button>
-              <div class="cause-heading">ULTRASOUND FINDINGS · 5H/5T</div>
-              <button class="cause-check" type="button" data-action="finding" data-value="us:tamponade">Tamponade · pericardial fluid / compression</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="us:hypovolemia">Hypovolemia · small/collapsible chambers</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="us:ptx_lt">Tension PTX concern · Lt lung</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="us:ptx_rt">Tension PTX concern · Rt lung</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="us:rv_strain">Thrombosis (PE) concern · RV strain</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="us:free_fluid">Hypovolemia/Trauma · eFAST free fluid</button>
-              <p class="cause-disclaimer">POCUS only if skilled; do not prolong CPR pauses. RV strain alone ≠ PE diagnosis. Cardiac standstill alone must not determine termination.</p>
+              <div class="cause-heading">PEA · FUNCTIONAL ASSESSMENT</div>
+              <div class="pea-mode-grid"><button type="button" data-pea-mode="pseudo">♥ Pseudo-PEA</button><button type="button" data-pea-mode="true">♡ True PEA</button></div>
+              <div class="cause-heading">ULTRASOUND FINDINGS</div>
+              <div class="result-grid"><div class="result-item"><button type="button" class="result-tile" data-result-key="us:tamponade" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><path d="M32 44 8 22C-5 5 20-4 32 12 44-4 69 5 56 22Z" fill="#aa626c" stroke="currentColor" stroke-width="2"/><path d="M9 25h13l5-9 8 17 5-8h15" fill="none" stroke="currentColor" stroke-width="2"/></svg><strong>Pericardium</strong><small class="result-status">Not assessed</small></button><select data-result-detail="us:tamponade" aria-label="Pericardium abnormal finding" hidden><option value="">Select abnormal finding</option><option>Pericardial effusion</option><option>Tamponade concern</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="us:lv" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><path d="M32 44 8 22C-5 5 20-4 32 12 44-4 69 5 56 22Z" fill="#aa626c" stroke="currentColor" stroke-width="2"/><path d="M9 25h13l5-9 8 17 5-8h15" fill="none" stroke="currentColor" stroke-width="2"/></svg><strong>LV function</strong><small class="result-status">Not assessed</small></button><select data-result-detail="us:lv" aria-label="LV function abnormal finding" hidden><option value="">Select abnormal finding</option><option>Severely reduced contraction</option><option>No visible cardiac motion</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="us:rv_strain" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><path d="M32 44 8 22C-5 5 20-4 32 12 44-4 69 5 56 22Z" fill="#aa626c" stroke="currentColor" stroke-width="2"/><path d="M9 25h13l5-9 8 17 5-8h15" fill="none" stroke="currentColor" stroke-width="2"/></svg><strong>RV</strong><small class="result-status">Not assessed</small></button><select data-result-detail="us:rv_strain" aria-label="RV abnormal finding" hidden><option value="">Select abnormal finding</option><option>RV dilatation</option><option>RV strain</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="us:hypovolemia" data-status="0"><span class="result-icon" aria-hidden="true">💧</span><strong>IVC / Volume</strong><small class="result-status">Not assessed</small></button><select data-result-detail="us:hypovolemia" aria-label="IVC / Volume abnormal finding" hidden><option value="">Select abnormal finding</option><option>Small / collapsible IVC</option><option>Dilated IVC</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="us:ptx_lt" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><path d="M32 2v17m0-5-10 12m10-12 10 12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M25 10Q9 11 4 35Q1 48 18 47L28 43V20Z" fill="#456579" stroke="currentColor"/><path d="M39 10Q55 11 60 35Q63 48 46 47L36 43V20Z" fill="#9bd3e5" stroke="currentColor"/></svg><strong>Left lung</strong><small class="result-status">Not assessed</small></button><select data-result-detail="us:ptx_lt" aria-label="Left lung abnormal finding" hidden><option value="">Select abnormal finding</option><option>Absent lung sliding</option><option>Lung point</option><option>Pleural fluid</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="us:ptx_rt" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><path d="M32 2v17m0-5-10 12m10-12 10 12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M25 10Q9 11 4 35Q1 48 18 47L28 43V20Z" fill="#9bd3e5" stroke="currentColor"/><path d="M39 10Q55 11 60 35Q63 48 46 47L36 43V20Z" fill="#456579" stroke="currentColor"/></svg><strong>Right lung</strong><small class="result-status">Not assessed</small></button><select data-result-detail="us:ptx_rt" aria-label="Right lung abnormal finding" hidden><option value="">Select abnormal finding</option><option>Absent lung sliding</option><option>Lung point</option><option>Pleural fluid</option></select></div></div>
+              <p class="cause-disclaimer">Do not prolong CPR pauses. RV strain alone does not diagnose PE; cardiac standstill alone does not determine termination.</p>
             </div>
             <div class="cause-pane" data-cause-pane="lab" hidden>
-              <div class="cause-heading">REVERSIBLE CAUSE · LAB CHECKLIST</div>
-              <button class="cause-check" type="button" data-action="finding" data-value="lab:gas">VBG / ABG · pH, HCO₃⁻, pCO₂ (acidosis/hypoxia)</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="lab:k">Potassium · hyper/hypokalemia</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="lab:glucose">Glucose · hypoglycemia</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="lab:ca">Ionized Ca²⁺</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="lab:mg">Magnesium</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="lab:hb">Hemoglobin / Hct · hemorrhage concern</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="lab:lactate">Lactate</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="lab:temp">Core temperature · hypothermia</button>
-              <p class="cause-disclaimer">บันทึกว่าตรวจหรือประเมินแล้ว ไม่ใช่บันทึกผลปกติ/ผิดปกติ และไม่ใช่คำสั่งตรวจอัตโนมัติ</p>
+              <div class="cause-heading">LAB RESULTS / ASSESSMENT</div>
+              <div class="result-grid"><div class="result-item"><button type="button" class="result-tile" data-result-key="lab:gas" data-status="0"><span class="result-icon" aria-hidden="true">🧪</span><strong>Blood gas</strong><small class="result-status">Not assessed</small></button><select data-result-detail="lab:gas" aria-label="Blood gas abnormal finding" hidden><option value="">Select abnormal finding</option><option>Acidosis</option><option>Alkalosis</option><option>Hypoxemia</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="lab:k" data-status="0"><span class="result-icon" aria-hidden="true">🧪</span><strong>Potassium</strong><small class="result-status">Not assessed</small></button><select data-result-detail="lab:k" aria-label="Potassium abnormal finding" hidden><option value="">Select abnormal finding</option><option>High</option><option>Low</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="lab:glucose" data-status="0"><span class="result-icon" aria-hidden="true">💧</span><strong>Glucose</strong><small class="result-status">Not assessed</small></button><select data-result-detail="lab:glucose" aria-label="Glucose abnormal finding" hidden><option value="">Select abnormal finding</option><option>High</option><option>Low</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="lab:ca" data-status="0"><span class="result-icon" aria-hidden="true">🧪</span><strong>Ionized Ca</strong><small class="result-status">Not assessed</small></button><select data-result-detail="lab:ca" aria-label="Ionized Ca abnormal finding" hidden><option value="">Select abnormal finding</option><option>High</option><option>Low</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="lab:mg" data-status="0"><span class="result-icon" aria-hidden="true">🧪</span><strong>Magnesium</strong><small class="result-status">Not assessed</small></button><select data-result-detail="lab:mg" aria-label="Magnesium abnormal finding" hidden><option value="">Select abnormal finding</option><option>High</option><option>Low</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="lab:hb" data-status="0"><span class="result-icon" aria-hidden="true">🩸</span><strong>Hb / Hct</strong><small class="result-status">Not assessed</small></button><select data-result-detail="lab:hb" aria-label="Hb / Hct abnormal finding" hidden><option value="">Select abnormal finding</option><option>Low</option><option>High</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="lab:lactate" data-status="0"><span class="result-icon" aria-hidden="true">🧪</span><strong>Lactate</strong><small class="result-status">Not assessed</small></button><select data-result-detail="lab:lactate" aria-label="Lactate abnormal finding" hidden><option value="">Select abnormal finding</option><option>High</option></select></div><div class="result-item"><button type="button" class="result-tile" data-result-key="lab:temp" data-status="0"><span class="result-icon" aria-hidden="true">🌡</span><strong>Temperature</strong><small class="result-status">Not assessed</small></button><select data-result-detail="lab:temp" aria-label="Temperature abnormal finding" hidden><option value="">Select abnormal finding</option><option>Hypothermia</option><option>Hyperthermia</option></select></div></div>
             </div>
             <div class="cause-pane" data-cause-pane="trauma" hidden>
-              <div class="cause-heading">TRAUMATIC ARREST</div>
-              <button class="cause-check" type="button" data-action="finding" data-value="trauma:efast">eFAST performed</button>
-              <button class="cause-check" type="button" data-action="finding" data-value="trauma:bleeding">Hemorrhage considered</button>
+              <div class="cause-heading">E-FAST · PATIENT ANATOMICAL SIDE</div>
+              <div class="result-grid efast-grid"><div class="result-item"><button type="button" class="result-tile" data-result-key="fast:lung_rt" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><path d="M32 2v17m0-5-10 12m10-12 10 12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M25 10Q9 11 4 35Q1 48 18 47L28 43V20Z" fill="#9bd3e5" stroke="currentColor"/><path d="M39 10Q55 11 60 35Q63 48 46 47L36 43V20Z" fill="#456579" stroke="currentColor"/></svg><strong>Right lung</strong><small class="result-status">Not assessed</small></button></div><div class="result-item"><button type="button" class="result-tile" data-result-key="fast:heart" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><path d="M32 44 8 22C-5 5 20-4 32 12 44-4 69 5 56 22Z" fill="#aa626c" stroke="currentColor" stroke-width="2"/><path d="M9 25h13l5-9 8 17 5-8h15" fill="none" stroke="currentColor" stroke-width="2"/></svg><strong>Pericardium</strong><small class="result-status">Not assessed</small></button></div><div class="result-item"><button type="button" class="result-tile" data-result-key="fast:lung_lt" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><path d="M32 2v17m0-5-10 12m10-12 10 12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M25 10Q9 11 4 35Q1 48 18 47L28 43V20Z" fill="#456579" stroke="currentColor"/><path d="M39 10Q55 11 60 35Q63 48 46 47L36 43V20Z" fill="#9bd3e5" stroke="currentColor"/></svg><strong>Left lung</strong><small class="result-status">Not assessed</small></button></div><div class="result-item"><button type="button" class="result-tile" data-result-key="fast:ruq" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><rect x="12" y="2" width="40" height="46" rx="12" fill="#456579" stroke="currentColor"/><path d="M32 4v42M13 25h38" stroke="currentColor" stroke-dasharray="3 3"/><circle cx="22" cy="15" r="7" fill="#f0d3a2" stroke="currentColor"/></svg><strong>RUQ</strong><small class="result-status">Not assessed</small></button></div><div class="result-item"><button type="button" class="result-tile" data-result-key="fast:pelvis" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><rect x="12" y="2" width="40" height="46" rx="12" fill="#456579" stroke="currentColor"/><path d="M32 4v42M13 25h38" stroke="currentColor" stroke-dasharray="3 3"/><circle cx="32" cy="38" r="7" fill="#f0d3a2" stroke="currentColor"/></svg><strong>Pelvis</strong><small class="result-status">Not assessed</small></button></div><div class="result-item"><button type="button" class="result-tile" data-result-key="fast:luq" data-status="0"><svg viewBox="0 0 64 50" aria-hidden="true"><rect x="12" y="2" width="40" height="46" rx="12" fill="#456579" stroke="currentColor"/><path d="M32 4v42M13 25h38" stroke="currentColor" stroke-dasharray="3 3"/><circle cx="42" cy="15" r="7" fill="#f0d3a2" stroke="currentColor"/></svg><strong>LUQ</strong><small class="result-status">Not assessed</small></button></div></div>
               <div class="cause-heading">PROCEDURES PERFORMED · RECORD ONLY</div>
-              <div class="trauma-procedure-grid">
-                <button type="button" data-action="procedure" data-value="icd_lt">ICD · Lt</button>
-                <button type="button" data-action="procedure" data-value="icd_rt">ICD · Rt</button>
-              </div>
-              <p class="cause-disclaimer">ICD หมายถึงการลงบันทึกหัตถการที่ทำแล้ว ไม่ใช่ข้อบ่งชี้ให้ใส่ท่อระบายทรวงอก</p>
+              <div class="trauma-procedure-grid"><button type="button" data-action="procedure" data-value="icd_lt">ICD · Lt</button><button type="button" data-action="procedure" data-value="icd_rt">ICD · Rt</button></div>
+              <p class="cause-disclaimer">ICD records a performed procedure, not an indication to perform it.</p>
             </div>
           </div>
         </div>
@@ -422,7 +394,7 @@
     </main>
 
     <footer class="footer">
-      <span>CPR LIVE V2.3 — PROOF OF CONCEPT</span>
+      <span>CPR LIVE V2.4 — PROOF OF CONCEPT</span>
       <span>Public demo channel · ไม่ใส่ข้อมูลผู้ป่วย · ไม่ใช้ในการรักษาจริง</span>
       <div class="link-grid footer-links">
         <button id="copyTvLink" class="link-btn">📺 แชร์ลิงก์ TV Display</button>
@@ -431,6 +403,6 @@
     </footer>
   </div>
   <script src="./config.js"></script>
-  <script type="module" src="./app.js?v=2.3.0"></script>
+  <script type="module" src="./app.js?v=2.4.0"></script>
 </body>
 </html>

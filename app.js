@@ -1,4 +1,4 @@
-// CPR Live v1.8 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v2.4 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -29,7 +29,7 @@ if(tvMode){
   document.title="CPR Live Monitor";
 }
 const DEVICE_ID = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + "-" + Math.random();
-const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2","charge","clear","adjunct","finding","procedure","display","leadWait"]);
+const ACTIONS = new Set(["start","pause","resume","reset","shock","epi","amio","rhythm","peaWidth","etTube","metro","rosc","etco2","charge","clear","adjunct","finding","procedure","display","leadWait","causeBatch","tubeDetails"]);
 const TWO_MIN = 120000;
 const FOUR_MIN = 240000;
 const SHOCK_COOLDOWN_MS = 100000; // 1 min 40 seconds for duplicate SHOCK logs
@@ -84,7 +84,7 @@ function actionGroup(type,value){ return ["adjunct","finding","procedure"].inclu
 function actionCooldownRemaining(s,type,now,value){
   // START is gated by standby/ROSC phase, so a rapid re-arrest cannot be
   // blocked by the five-second duplicate tap guard from the previous episode.
-  if(type==="start" || type==="resume" || type==="pause")return 0;
+  if(["start","resume","pause","causeBatch","tubeDetails"].includes(type))return 0;
   if(type==="shock")return s.lastShockAt===null?0:Math.max(0,s.lastShockAt+SHOCK_COOLDOWN_MS-now);
   if(type==="epi")return s.lastEpiAt===null?0:Math.max(0,s.lastEpiAt+EPI_COOLDOWN_MS-now);
   const last=s.lastActionAt[actionGroup(type,value)];
@@ -104,6 +104,51 @@ const pendingActions = new Set(); // Other actions locked before awaiting Supaba
 let dashboardOpen=false;
 let causeToolsOpen=false;
 let causeTab="pocus";
+let causeDraft={},causeDraftKey="";
+const CAUSE_ITEMS={
+ "us:tamponade":["Pericardium","♥",["Pericardial effusion","Tamponade concern"]],
+ "us:lv":["LV function","♥",["Severely reduced contraction","No visible cardiac motion"]],
+ "us:rv_strain":["RV","♥",["RV dilatation","RV strain"]],
+ "us:hypovolemia":["IVC / Volume","💧",["Small / collapsible IVC","Dilated IVC"]],
+ "us:ptx_lt":["Left lung","🫁",["Absent lung sliding","Lung point","Pleural fluid"]],
+ "us:ptx_rt":["Right lung","🫁",["Absent lung sliding","Lung point","Pleural fluid"]],
+ "lab:gas":["Blood gas","🧪",["Acidosis","Alkalosis","Hypoxemia"]],
+ "lab:k":["Potassium","🧪",["High","Low"]],
+ "lab:glucose":["Glucose","💧",["High","Low"]],
+ "lab:ca":["Ionized Ca","🧪",["High","Low"]],
+ "lab:mg":["Magnesium","🧪",["High","Low"]],
+ "lab:hb":["Hb / Hct","🩸",["Low","High"]],
+ "lab:lactate":["Lactate","🧪",["High"]],
+ "lab:temp":["Temperature","🌡",["Hypothermia","Hyperthermia"]],
+ "fast:heart":["Pericardium","♥",[]],
+ "fast:ruq":["RUQ","",[]],"fast:luq":["LUQ","",[]],"fast:pelvis":["Pelvis","",[]],
+ "fast:lung_lt":["Left lung","🫁",[]],"fast:lung_rt":["Right lung","🫁",[]]
+};
+function validCauseBatch(value){
+ if(!value || typeof value!=="object" || Array.isArray(value))return false;
+ const entries=Object.entries(value);
+ return entries.length>0 && entries.length<=30 && entries.every(([k,v])=>{
+  if(!v || !Number.isInteger(v.status)||v.status<0||v.status>2||typeof v.detail!=="string")return false;
+  if(k==="pea:mode")return (v.status===0&&v.detail==="")||(v.status===1&&["pseudo","true"].includes(v.detail));
+  if(!Object.prototype.hasOwnProperty.call(CAUSE_ITEMS,k))return false;
+  const choices=CAUSE_ITEMS[k][2];
+  return v.status===2&&choices.length?choices.includes(v.detail):v.detail==="";
+ });
+}
+function validTubeDetails(v){return v && typeof v==="object" && Number.isFinite(v.size)&&v.size>=2&&v.size<=10&&Number.isFinite(v.depth)&&v.depth>0&&v.depth<=40;}
+function causeLabel(k,v){
+ if(k==="pea:mode")return v.status===0?"PEA assessment cleared":v.detail==="pseudo"?"Possible pseudo-PEA (cardiac motion)":"Possible true PEA (no visible motion)";
+ const item=CAUSE_ITEMS[k];return (k.startsWith("fast:")?"E-FAST ":k.startsWith("lab:")?"LAB ":"US ")+item[0]+": "+(["Not assessed","Negative / normal","Positive / abnormal"][v.status])+(v.detail?" — "+v.detail:"");
+}
+function savedCauseLabels(s,prefix,status){
+ return Object.entries(s.causeResults||{}).filter(([k,v])=>k.startsWith(prefix)&&v.status===status).map(([k,v])=>causeLabel(k,v));
+}
+function tubeLabel(s){return s.tubeDetails?"ETT "+s.tubeDetails.size+" mm · "+s.tubeDetails.depth+" cm at lip":"ET-TUBE";}
+function syncCauseDraft(s){
+ const key=room+"|"+s.sessionId+"|"+s.episode;
+ if(causeDraftKey!==key){causeDraftKey=key;causeDraft={};}
+}
+
 let bicarbPickerOpen=false;
 let calciumPickerOpen=false;
 let roscReviewOpen=false; // Local checklist review; ROSC broadcasts only on confirmation.
@@ -164,7 +209,7 @@ function blankState() {
     clearAt:null,
     adjunctCounts:{},
     peaWidth:null,etco2:null,advancedAirway:false,ventAnchor:null,coachAnchor:null,
-    findings:{},procedures:{},
+    findings:{},procedures:{},causeResults:{},tubeDetails:null,
     metronomeOn:true,tvDashboard:false,lastActionAt:{},timeline:[]
   };
 }
@@ -259,7 +304,7 @@ function computeState() {
       s.shockFlow=null;
       s.clearAt=null;
       s.peaWidth=null;
-      s.findings={};s.procedures={}; // Re-arrest starts a fresh cause assessment.
+      s.findings={};s.procedures={};s.causeResults={}; // Re-arrest starts a fresh cause assessment.
       if(s.advancedAirway)s.ventAnchor=t; // Re-arrest: start a new 6-second breath cycle.
       // The epinephrine clock starts only on a documented dose.
       // Before a dose the TV displays "NO NEED".
@@ -440,6 +485,16 @@ function computeState() {
       if(s.phase==="running")beginCompression(s,t);
       s.ventAnchor=t;
       line(s,e,"ET-TUBE (reported placed) — ventilation coach started");
+    } else if(e.type==="tubeDetails" && ["running","paused","rosc"].includes(s.phase) && s.advancedAirway && validTubeDetails(e.value)){
+      s.tubeDetails={size:e.value.size,depth:e.value.depth};
+      line(s,e,tubeLabel(s));
+    } else if(e.type==="causeBatch" && ["running","paused","rosc"].includes(s.phase) && validCauseBatch(e.value)){
+      for(const [k,v] of Object.entries(e.value)){
+        s.causeResults[k]={status:v.status,detail:v.detail};
+        if(k==="pea:mode"){s.findings["pea:pseudo"]=v.status===1&&v.detail==="pseudo";s.findings["pea:true"]=v.status===1&&v.detail==="true";}
+        else if(k.startsWith("us:"))s.findings[k]=false; // explicit results supersede old checkbox semantics
+      }
+      line(s,e,"REVERSIBLE CAUSES SAVED: "+Object.entries(e.value).map(([k,v])=>causeLabel(k,v)).join("; "));
     } else if (e.type==="adjunct" &&
       ["running","paused"].includes(s.phase) && ADJUNCT_NAMES[e.value]){
       s.adjunctCounts[e.value]=(s.adjunctCounts[e.value]||0)+1;
@@ -875,7 +930,7 @@ function renderVentilation(s,clock) {
   tv.hidden=mobile.hidden=!show;
   if(!show)return;
   const paused=s.phase==="paused";
-  document.getElementById("ventMode").textContent=s.advancedAirway?"ET-TUBE":"30:2";
+  document.getElementById("ventMode").textContent=s.advancedAirway?tubeLabel(s):"30:2";
   document.getElementById("ventRatio").hidden=true; // 30:2 already appears in EtCO2 heading.
   document.getElementById("bagIcon").hidden=!s.advancedAirway;
   document.getElementById("maskIcon").hidden=s.advancedAirway;
@@ -915,7 +970,7 @@ function rhythmUltrasoundSummary(s){
     ["us:free_fluid","eFAST free fluid"]
   ];
   return {functionText,positives:relevant?
-    ultrasoundKeys.filter(([key])=>!!s.findings[key]).map(([,label])=>label):[]};
+    [...ultrasoundKeys.filter(([key])=>!!s.findings[key]).map(([,label])=>label),...savedCauseLabels(s,"us:",2),...savedCauseLabels(s,"fast:",2)]:[]};
 }
 function recordedMedLabSummary(s){
   const meds=[];
@@ -940,7 +995,7 @@ function recordedMedLabSummary(s){
     const name=raw.replace(/^Lab: /,"").replace(/^Check: /,"");
     labs.set(name,checked);
   }
-  return {meds,labs:[...labs].filter(([,checked])=>checked).map(([name])=>name)};
+  return {meds,labs:[...labs].filter(([,checked])=>checked).map(([name])=>name).concat(savedCauseLabels(s,"lab:",2))};
 }
 function renderRhythmMedLab(s){
   const panel=document.getElementById("rhythmMedLabSummary");
@@ -963,13 +1018,14 @@ function renderRhythmUltrasound(s){
   const findingsValue=document.getElementById("positiveUsgValue");
   const info=rhythmUltrasoundSummary(s);
   const isPea=s.rhythm==="PEA";
-  const showUs=isPea || (s.rhythm==="Asystole" && info.positives.length>0);
+  const allPos=[...new Set([...info.positives,...savedCauseLabels(s,"us:",2),...savedCauseLabels(s,"fast:",2)])];
+  const showUs=isPea || allPos.length>0;
   functionRow.hidden=!isPea;
   findingsRow.hidden=!showUs;
   area.hidden=!isPea&&!showUs;
   if(isPea)functionValue.textContent=info.functionText||"NOT RECORDED";
-  if(showUs)findingsValue.textContent=info.positives.length?
-    info.positives.join("  •  "):"NOT RECORDED";
+  if(showUs)findingsValue.textContent=allPos.length?
+    allPos.join("  •  "):"NOT RECORDED";
 }
 function renderEtco2Prompt(s) {
   const card=document.getElementById("co2Stat");
@@ -986,7 +1042,7 @@ function renderEtco2Prompt(s) {
   heading.textContent=noTube?"AMBU 30:2":"EtCO₂";
   const ventHeading=document.getElementById("ventHeading");
   ventHeading.hidden=false;
-  ventHeading.textContent=noTube?"AMBU 30:2":"AMBU";
+  ventHeading.textContent=noTube?"AMBU 30:2":s.tubeDetails?tubeLabel(s):"AMBU";
   // The ventilation coach is embedded in this same tile, so do not repeat 30:2.
   prompt.hidden=!waiting;
   normalValue.hidden=noTube||waiting;
@@ -997,6 +1053,15 @@ function renderAirwayAndRhythm(s) {
   const active=["running","paused"].includes(s.phase);
   document.getElementById("etTubeBtn").hidden=s.advancedAirway;
   document.getElementById("etco2Form").hidden=!s.advancedAirway;
+  const tubeForm=document.getElementById("tubeDetailsForm");
+  if(tubeForm){
+    tubeForm.hidden=!s.advancedAirway||!active;
+    const key=room+"|"+s.sessionId;
+    if(tubeForm.dataset.session!==key){tubeForm.reset();tubeForm.dataset.session=key;}
+    const label=document.getElementById("tubeDetailsStatus");
+    label.textContent=s.tubeDetails?tubeLabel(s):"Size / depth not recorded";
+    document.getElementById("tubeDetailsSave").disabled=!connected||pendingActions.has("tubeDetails");
+  }
   document.getElementById("peaWidthPicker").hidden=!(active && s.rhythm==="PEA");
   document.getElementById("rhythmWarning").hidden=!(active && s.rhythm==="—");
   document.querySelectorAll(".rhythm-button").forEach(btn=>
@@ -1029,6 +1094,7 @@ function roscSelectionAvailable(s){
 function renderCauseTools(s){
   if(tvMode)return;
   const active=["running","paused"].includes(s.phase);
+  syncCauseDraft(s);
   if(!active){bicarbPickerOpen=false;calciumPickerOpen=false;causeToolsOpen=false;causeTab="pocus";}
   const tool=document.getElementById("nonShockTools");
   tool.hidden=!active; // POCUS, lab and trauma remain available for VF/pVT too.
@@ -1036,6 +1102,27 @@ function renderCauseTools(s){
   const toggle=document.getElementById("causeToolsToggle");
   toggle.disabled=!connected || !active;
   toggle.setAttribute("aria-expanded",String(active && causeToolsOpen));
+  const dirty=Object.keys(causeDraft).length>0;
+  toggle.textContent="REVERSIBLE CAUSES"+(dirty?" · UNSAVED":"")+(causeToolsOpen?" −":" ＋");
+  const save=document.getElementById("causeSave");
+  save.disabled=!dirty||!connected||!validCauseBatch(causeDraft)||pendingActions.has("causeBatch");
+  document.getElementById("causeUnsaved").textContent=dirty?"⚠ Unsaved findings"+(validCauseBatch(causeDraft)?"":" — select abnormal detail"):"No unsaved findings";
+  document.getElementById("causeUnsaved").classList.toggle("dirty",dirty);
+  document.querySelectorAll("[data-result-key]").forEach(btn=>{
+    const k=btn.dataset.resultKey,v=causeDraft[k]||s.causeResults[k]||{status:0,detail:""};
+    btn.dataset.status=String(v.status);
+    btn.disabled=!active||!connected||pendingActions.has("causeBatch");
+    btn.querySelector(".result-status").textContent=["Not assessed","✓ Negative","! Positive"][v.status];
+    btn.setAttribute("aria-label",CAUSE_ITEMS[k][0]+" — "+["Not assessed","Negative / normal","Positive / abnormal"][v.status]);
+    const select=document.querySelector('[data-result-detail="'+k+'"]');
+    if(select){select.hidden=v.status!==2;if(select.value!==v.detail)select.value=v.detail;select.disabled=btn.disabled;}
+  });
+  const pea=causeDraft["pea:mode"]||s.causeResults["pea:mode"];
+  document.querySelectorAll("[data-pea-mode]").forEach(btn=>{
+    const selected=pea?pea.status===1&&pea.detail===btn.dataset.peaMode:!!s.findings["pea:"+btn.dataset.peaMode];
+    btn.classList.toggle("selected",selected);
+    btn.disabled=!connected||!active||s.rhythm!=="PEA"||pendingActions.has("causeBatch");
+  });
   const hasQrs=active && s.rhythm==="PEA" && !!s.lastPeaWidth;
   document.getElementById("qrsInvestigations").hidden=!hasQrs;
   document.getElementById("qrsNarrowChecklist").hidden=!hasQrs||s.lastPeaWidth!=="Narrow";
@@ -1107,7 +1194,9 @@ function renderReportDashboard(s,clock){
   const procedures=s.timeline.filter(e=>e.label==="ICD Lt"||e.label==="ICD Rt");
   if(procedures.length)records.push(["ICD",procedures.map(e=>e.label.replace("ICD ","")).join(", ")]);
   const pocus=s.timeline.filter(e=>e.label.startsWith("CHECKED: ")||e.label.startsWith("UNCHECKED: "));
-  if(pocus.length)records.push(["POCUS / LAB / TRAUMA",pocus.length+" checklist updates"]);
+  const batches=s.timeline.filter(e=>e.label.startsWith("REVERSIBLE CAUSES SAVED:"));
+  if(pocus.length||batches.length)records.push(["REVERSIBLE CAUSES",batches.length+" saved assessments · "+pocus.length+" legacy checks"]);
+  if(s.advancedAirway)records.push(["AIRWAY",tubeLabel(s)]);
   const list=document.getElementById("dashTreatmentSummary");
   list.replaceChildren();
   if(!records.length){
@@ -1168,7 +1257,7 @@ function renderTvActionTimeline(s){
       name.startsWith("Lidocaine")||
       name.startsWith("PRC ·")||
       name.startsWith("ICD ")||
-      name.startsWith("ROSC —");
+      name.startsWith("ROSC —")||name.startsWith("ETT ")||name.startsWith("ET-TUBE")||name.startsWith("REVERSIBLE CAUSES SAVED:");
   });
   // Limit only displayed marker density, not the underlying bands or recorded data.
   events.slice(-48).forEach((entry,index)=>{
@@ -1176,7 +1265,7 @@ function renderTvActionTimeline(s){
     const icon=title.startsWith("CLEAR FIRST")?"⚡":
       title.startsWith("RHYTHM")?"♥":
       title.startsWith("ROSC")?"✓":
-      title.startsWith("ICD")?"✚":"💉";
+      title.startsWith("ICD")||title.startsWith("ET")?"✚":title.startsWith("REVERSIBLE CAUSES")?"🔎":"💉";
     const marker=document.createElement("span");
     marker.className="tv-time-marker tv-time-marker-"+(index%2);
     marker.textContent=icon;
@@ -1253,7 +1342,7 @@ function renderTvReportDashboard(s,clock){
     ["us:ptx_lt","Possible PTX Lt"],["us:ptx_rt","Possible PTX Rt"],
     ["us:rv_strain","RV strain"],["us:free_fluid","Free fluid"]
   ].filter(([key])=>s.findings[key]).map(([,label])=>label);
-  put("tvDashPocus",positives.join(" · ")||"—");
+  put("tvDashPocus",[...positives,...savedCauseLabels(s,"us:",2),...savedCauseLabels(s,"fast:",2)].join(" · ")||"—");
   const procedures=Object.entries(s.procedures)
     .filter(([,checked])=>!!checked).map(([key])=>PROCEDURE_NAMES[key]||key);
   put("tvDashProcedures",procedures.join(" · ")||"—");
@@ -1290,7 +1379,7 @@ function renderControllerStage(s) {
   document.getElementById("stageDashboardBtn").disabled=stage!=="reArrest";
   document.getElementById("stageDashboardPdfBtn").disabled=stage!=="dashboard";
   document.getElementById("stageDashboardBackBtn").disabled=stage!=="dashboard";
-  if(stage==="rhythm"){causeToolsOpen=false;causeTab="pocus";}
+  if(stage!=="normal"){causeToolsOpen=false;}
   if(stage==="dashboard")renderReportDashboard(s,elapsedFor(s,Date.now()));
   const rhythmRosc=document.getElementById("stageRoscPromptBtn");
   rhythmRosc.disabled=!connected || stage!=="rhythm";
@@ -1481,8 +1570,7 @@ function render() {
   pauseResume.dataset.value=manualPaused?"":firstRhythmPending?"rhythm":"manual";
   const remaining=Math.max(0,(10000-clock.currentPauseMs)/1000);
   pauseResume.textContent=manualPaused?
-    "▶ RESUME CPR · "+(remaining>0?remaining.toFixed(1)+" s LEFT":"OVER 10 s")+
-    " · HANDS-OFF "+(clock.currentPauseMs/1000).toFixed(1)+" s":
+    "▶ RESUME CPR · HANDS-OFF "+Math.ceil(remaining)+" s":
     firstRhythmPending?"Ⅱ PAUSE CPR · CHECK RHYTHM":"Ⅱ PAUSE CPR";
   pauseResume.classList.toggle("resume-flash",manualPaused);
   pauseResume.classList.toggle("pause-overrun",manualPaused&&remaining===0);
@@ -1598,6 +1686,8 @@ function validEvent(obj) {
   if (obj.type==="amio" && obj.value!==300 && obj.value!==150)return false;
   if (obj.type==="adjunct" && !ADJUNCT_NAMES[obj.value])return false;
   if (obj.type==="finding" && !FINDING_LABELS[obj.value])return false;
+  if(obj.type==="causeBatch"&&!validCauseBatch(obj.value))return false;
+  if(obj.type==="tubeDetails"&&!validTubeDetails(obj.value))return false;
   if (obj.type==="procedure" && !PROCEDURE_NAMES[obj.value])return false;
   if (obj.type==="etco2" && (!Number.isInteger(obj.value)||obj.value<0||obj.value>150)) return false;
   return true;
@@ -1638,6 +1728,8 @@ async function handleAction(type,value) {
   if(type==="charge" && s.shockFlow!=="decision")return;
   if(type==="clear" && !["decision","charging"].includes(s.shockFlow))return;
   if(type==="adjunct" && (!["running","paused"].includes(s.phase) || !ADJUNCT_NAMES[value]))return;
+  if(type==="causeBatch"&&(!["running","paused","rosc"].includes(s.phase)||!validCauseBatch(value)))return;
+  if(type==="tubeDetails"&&(!["running","paused","rosc"].includes(s.phase)||!s.advancedAirway||!validTubeDetails(value)))return;
   if(type==="finding" && (!["running","paused"].includes(s.phase) ||
       !FINDING_LABELS[value] || (value.startsWith("pea:") && s.rhythm!=="PEA") ||
       (value.startsWith("qrs:") && !s.lastPeaWidth)))return;
@@ -1671,6 +1763,7 @@ async function handleAction(type,value) {
     // by project-specific choice. The button logs a dose, not a recommendation.
     value=next;
   }
+  const submittedDraftKey=causeDraftKey;
   const e={id:DEVICE_ID+"-"+(++sequence),type,ts:Date.now(),seq:sequence,value};
   pendingActions.add(type); // Lock synchronously before network await.
   if(type==="shock")pendingShock=true;
@@ -1683,6 +1776,9 @@ async function handleAction(type,value) {
     if(type==="display")void transmit("cpr-display",e)
       .catch(err=>console.warn("Display mirror broadcast",err));
     acceptEvent(e,true); // TV only speaks; controller stays silent.
+    if(type==="causeBatch"&&submittedDraftKey===causeDraftKey&&computeState().timeline.some(x=>x.id===e.id)){
+      for(const [k,v] of Object.entries(value))if(JSON.stringify(causeDraft[k])===JSON.stringify(v))delete causeDraft[k];
+    }
     if(type==="peaWidth"){
       causeToolsOpen=true;
       causeTab=value==="Wide"?"lab":"pocus";
@@ -1881,7 +1977,8 @@ function buildReportElement(s){
     ["EPINEPHRINE",s.epi],
     ["AMIODARONE",s.amioDoses.length?s.amioDoses.join(" + ")+" mg":"—"],
     ["LAST RHYTHM",s.rhythm==="PEA"&&s.peaWidth?"PEA ("+s.peaWidth+" QRS)":s.rhythm==="VT"?"pVT":s.rhythm],
-    ["LAST CO₂",s.etco2===null?"—":s.etco2+" mmHg"]
+    ["LAST CO₂",s.etco2===null?"—":s.etco2+" mmHg"],
+    ["AIRWAY",s.advancedAirway?tubeLabel(s):"—"]
   ];
   for(const [label,value] of items){
     const item=document.createElement("div");
@@ -2058,6 +2155,37 @@ if(!tvMode){
     calciumPickerOpen=!calciumPickerOpen;
     render();
   });
+  // Local draft only; one broadcast on explicit Save.
+  document.querySelectorAll("[data-result-key]").forEach(btn=>btn.addEventListener("click",()=>{
+    const s=computeState();syncCauseDraft(s);
+    const k=btn.dataset.resultKey,v=causeDraft[k]||s.causeResults[k]||{status:0,detail:""};
+    const next={status:(v.status+1)%3,detail:""};
+    causeDraft[k]=next;render();
+  }));
+  document.querySelectorAll("[data-result-detail]").forEach(el=>el.addEventListener("change",()=>{
+    const k=el.dataset.resultDetail;
+    causeDraft[k]={status:2,detail:el.value};render();
+  }));
+  document.querySelectorAll("[data-pea-mode]").forEach(btn=>btn.addEventListener("click",()=>{
+    const s=computeState();syncCauseDraft(s);
+    if(s.rhythm!=="PEA")return;
+    const old=causeDraft["pea:mode"]||s.causeResults["pea:mode"];
+    const same=old&&old.status===1&&old.detail===btn.dataset.peaMode;
+    causeDraft["pea:mode"]=same?{status:0,detail:""}:{status:1,detail:btn.dataset.peaMode};render();
+  }));
+  document.getElementById("causeSave").addEventListener("click",()=>{
+    const s=computeState();syncCauseDraft(s);
+    if(validCauseBatch(causeDraft))void handleAction("causeBatch",JSON.parse(JSON.stringify(causeDraft)));
+  });
+  document.getElementById("tubeDetailsForm").addEventListener("submit",e=>{
+    e.preventDefault();
+    const size=document.getElementById("tubeSize").valueAsNumber,depth=document.getElementById("tubeDepth").valueAsNumber;
+    if(validTubeDetails({size,depth}))void handleAction("tubeDetails",{size,depth});
+  });
+  document.querySelectorAll("[data-tube-step]").forEach(btn=>btn.addEventListener("click",()=>{
+    const input=document.getElementById(btn.dataset.input);
+    if(btn.dataset.tubeStep==="up")input.stepUp();else input.stepDown();
+  }));
   document.getElementById("causeToolsToggle").addEventListener("click",()=>{
     const s=computeState();
     if(!connected||!["running","paused"].includes(s.phase))return;
