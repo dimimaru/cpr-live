@@ -1062,7 +1062,9 @@ function renderAirwayAndRhythm(s) {
     tubeForm.hidden=!s.advancedAirway||!active||!!s.tubeDetails;
     const key=room+"|"+s.sessionId;
     if(tubeForm.dataset.session!==key){tubeForm.reset();tubeForm.dataset.session=key;}
-    document.getElementById("airwayAction").classList.toggle("split-airway",!tubeForm.hidden);
+    const airway=document.getElementById("airwayAction");
+    airway.classList.toggle("split-airway",!tubeForm.hidden);
+    airway.classList.toggle("airway-placed",s.advancedAirway);
     document.getElementById("tubeDetailsSave").disabled=!connected||pendingActions.has("tubeDetails");
   }
   document.getElementById("peaWidthPicker").hidden=!(active && s.rhythm==="PEA");
