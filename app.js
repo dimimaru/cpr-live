@@ -84,7 +84,7 @@ function actionGroup(type,value){ return ["adjunct","finding","procedure"].inclu
 function actionCooldownRemaining(s,type,now,value){
   // START is gated by standby/ROSC phase, so a rapid re-arrest cannot be
   // blocked by the five-second duplicate tap guard from the previous episode.
-  if(type==="start" || type==="resume" || type==="pause")return 0;
+  if(["start","resume","pause","causeBatch","tubeDetails"].includes(type))return 0;
   if(type==="shock")return s.lastShockAt===null?0:Math.max(0,s.lastShockAt+SHOCK_COOLDOWN_MS-now);
   if(type==="epi")return s.lastEpiAt===null?0:Math.max(0,s.lastEpiAt+EPI_COOLDOWN_MS-now);
   const last=s.lastActionAt[actionGroup(type,value)];
@@ -141,7 +141,7 @@ function causeLabel(k,v){
  const item=CAUSE_ITEMS[k];return (k.startsWith("fast:")?"E-FAST ":k.startsWith("lab:")?"LAB ":"US ")+item[0]+": "+(["Not assessed","Negative / normal","Positive / abnormal"][v.status])+(v.detail?" — "+v.detail:"");
 }
 function savedCauseLabels(s,prefix,status){
- return Object.entries(s.causeResults).filter(([k,v])=>k.startsWith(prefix)&&v.status===status).map(([k,v])=>causeLabel(k,v));
+ return Object.entries(s.causeResults||{}).filter(([k,v])=>k.startsWith(prefix)&&v.status===status).map(([k,v])=>causeLabel(k,v));
 }
 function tubeLabel(s){return s.tubeDetails?"ETT "+s.tubeDetails.size+" mm · "+s.tubeDetails.depth+" cm at lip":"ET-TUBE";}
 function syncCauseDraft(s){
@@ -1113,6 +1113,7 @@ function renderCauseTools(s){
     btn.dataset.status=String(v.status);
     btn.disabled=!active||!connected||pendingActions.has("causeBatch");
     btn.querySelector(".result-status").textContent=["Not assessed","✓ Negative","! Positive"][v.status];
+    btn.setAttribute("aria-label",CAUSE_ITEMS[k][0]+" — "+["Not assessed","Negative / normal","Positive / abnormal"][v.status]);
     const select=document.querySelector('[data-result-detail="'+k+'"]');
     if(select){select.hidden=v.status!==2;if(select.value!==v.detail)select.value=v.detail;select.disabled=btn.disabled;}
   });
@@ -1762,6 +1763,7 @@ async function handleAction(type,value) {
     // by project-specific choice. The button logs a dose, not a recommendation.
     value=next;
   }
+  const submittedDraftKey=causeDraftKey;
   const e={id:DEVICE_ID+"-"+(++sequence),type,ts:Date.now(),seq:sequence,value};
   pendingActions.add(type); // Lock synchronously before network await.
   if(type==="shock")pendingShock=true;
@@ -1774,7 +1776,7 @@ async function handleAction(type,value) {
     if(type==="display")void transmit("cpr-display",e)
       .catch(err=>console.warn("Display mirror broadcast",err));
     acceptEvent(e,true); // TV only speaks; controller stays silent.
-    if(type==="causeBatch"){
+    if(type==="causeBatch"&&submittedDraftKey===causeDraftKey&&computeState().timeline.some(x=>x.id===e.id)){
       for(const [k,v] of Object.entries(value))if(JSON.stringify(causeDraft[k])===JSON.stringify(v))delete causeDraft[k];
     }
     if(type==="peaWidth"){
