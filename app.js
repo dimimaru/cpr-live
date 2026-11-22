@@ -130,7 +130,7 @@ function validCauseBatch(value){
  return entries.length>0 && entries.length<=30 && entries.every(([k,v])=>{
   if(!v || !Number.isInteger(v.status)||v.status<0||v.status>2||typeof v.detail!=="string")return false;
   if(k==="pea:mode")return (v.status===0&&v.detail==="")||(v.status===1&&["pseudo","true"].includes(v.detail));
-  if(!Object.hasOwn(CAUSE_ITEMS,k))return false;
+  if(!Object.prototype.hasOwnProperty.call(CAUSE_ITEMS,k))return false;
   const choices=CAUSE_ITEMS[k][2];
   return v.status===2&&choices.length?choices.includes(v.detail):v.detail==="";
  });
@@ -1042,7 +1042,7 @@ function renderEtco2Prompt(s) {
   heading.textContent=noTube?"AMBU 30:2":"EtCO₂";
   const ventHeading=document.getElementById("ventHeading");
   ventHeading.hidden=false;
-  ventHeading.textContent=noTube?"AMBU 30:2":"AMBU";
+  ventHeading.textContent=noTube?"AMBU 30:2":s.tubeDetails?tubeLabel(s):"AMBU";
   // The ventilation coach is embedded in this same tile, so do not repeat 30:2.
   prompt.hidden=!waiting;
   normalValue.hidden=noTube||waiting;
