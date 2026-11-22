@@ -2187,3 +2187,54 @@ body.tv-mode .vent-tube-details:not([hidden]){
 
 body:not(.tv-mode) .remote-main #airwayAction.airway-placed{grid-column:1/-1}
 body:not(.tv-mode) .remote-main:has(#airwayAction.airway-placed) .epi-control{grid-column:1/-1}
+
+/* v2.4.2 – compact remote header and post-save airway updates */
+body:not(.tv-mode) .compact-remote-header{
+  display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;
+  gap:7px;margin-bottom:6px;min-height:36px;
+}
+body:not(.tv-mode) .compact-remote-header .mode-badge{font-size:11px;white-space:nowrap;padding:5px 7px}
+body:not(.tv-mode) .compact-remote-header .remote-version{font-size:10px;color:#9fb6cd;white-space:nowrap}
+body:not(.tv-mode) .compact-remote-header .connection{margin-left:auto;font-size:9px;white-space:nowrap;padding:4px 5px}
+body:not(.tv-mode) .compact-remote-header #toggleMetronome{
+  flex:0 0 37px;min-width:37px;width:37px;min-height:37px;height:37px;padding:0;
+  font-size:17px;line-height:1;border-radius:9px;
+}
+body:not(.tv-mode) .compact-quick-status{
+  display:grid;grid-template-columns:1.2fr .8fr .7fr 1.1fr;gap:4px;margin-bottom:7px;
+}
+body:not(.tv-mode) .compact-quick-status>span{
+  text-align:center;min-width:0;white-space:nowrap;padding:7px 2px;font-size:clamp(11px,3vw,15px);
+}
+body:not(.tv-mode) .compact-quick-status .quick-rhythm{color:#b9eacb}
+body:not(.tv-mode) .inline-number{display:flex;min-width:0;position:relative;align-items:stretch}
+body:not(.tv-mode) .inline-number input{padding-right:34px;min-height:42px;appearance:textfield}
+body:not(.tv-mode) .inline-number input::-webkit-inner-spin-button,
+body:not(.tv-mode) .inline-number input::-webkit-outer-spin-button{appearance:none;margin:0}
+body:not(.tv-mode) .number-arrows{position:absolute;inset:1px 1px 1px auto;width:32px;display:grid;grid-template-rows:1fr 1fr}
+body:not(.tv-mode) .number-arrows button{
+  min-width:0;min-height:0;line-height:1;padding:0;border:0;border-left:1px solid #526d83;
+  background:#34536b;color:#fff;font-size:12px;
+}
+body:not(.tv-mode) .number-arrows button:first-child{border-radius:0 5px 0 0;border-bottom:1px solid #526d83}
+body:not(.tv-mode) .number-arrows button:last-child{border-radius:0 0 5px 0}
+body:not(.tv-mode) .number-arrows button:disabled{opacity:.35}
+body:not(.tv-mode) #airwayAction[hidden],body:not(.tv-mode) #airwayUpdates[hidden],
+body:not(.tv-mode) #airwayUpdates button[hidden],body:not(.tv-mode) #etco2Form[hidden]{display:none!important}
+body:not(.tv-mode) .airway-updates{margin-top:8px}
+body:not(.tv-mode) .airway-update-buttons{display:flex;gap:8px}
+body:not(.tv-mode) .airway-update-buttons button{
+  flex:1 1 0;min-height:40px;border-radius:9px;background:#203d54;color:#d8ecf7;
+  border:1px solid #4c728c;font-weight:800;font-size:12px;padding:5px;
+}
+body:not(.tv-mode) .airway-update-fields .tube-details,
+body:not(.tv-mode) .airway-update-fields .etco2-form{margin-top:6px;width:100%;box-sizing:border-box}
+body:not(.tv-mode) .timeline-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px}
+body:not(.tv-mode) .timeline-actions #resetBtn{min-height:36px;font-size:11px;padding:5px 8px}
+body:not(.tv-mode).remote-stage-reArrest .timeline-section,
+body:not(.tv-mode).remote-stage-dashboard .timeline-section{display:block!important}
+@media(max-width:360px){
+ body:not(.tv-mode) .compact-remote-header{gap:4px}
+ body:not(.tv-mode) .compact-remote-header .mode-badge{font-size:10px;padding:4px}
+ body:not(.tv-mode) .compact-remote-header .connection{font-size:8px;padding:3px}
+}
