@@ -1,4 +1,4 @@
-// CPR Live v2.4 — ephemeral Supabase Broadcast demonstration.
+// CPR Live v2.4.1 — ephemeral Supabase Broadcast demonstration.
 // No user authentication, server authority, or durable database.
 // NOT for clinical treatment, medication decision support, or patient data.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0?bundle";
@@ -930,7 +930,7 @@ function renderVentilation(s,clock) {
   tv.hidden=mobile.hidden=!show;
   if(!show)return;
   const paused=s.phase==="paused";
-  document.getElementById("ventMode").textContent=s.advancedAirway?tubeLabel(s):"30:2";
+  document.getElementById("ventMode").textContent=s.advancedAirway?"ET-TUBE":"30:2";
   document.getElementById("ventRatio").hidden=true; // 30:2 already appears in EtCO2 heading.
   document.getElementById("bagIcon").hidden=!s.advancedAirway;
   document.getElementById("maskIcon").hidden=s.advancedAirway;
@@ -1042,7 +1042,11 @@ function renderEtco2Prompt(s) {
   heading.textContent=noTube?"AMBU 30:2":"EtCO₂";
   const ventHeading=document.getElementById("ventHeading");
   ventHeading.hidden=false;
-  ventHeading.textContent=noTube?"AMBU 30:2":s.tubeDetails?tubeLabel(s):"AMBU";
+  ventHeading.textContent=noTube?"AMBU 30:2":"AMBU";
+  const tubeCaption=document.getElementById("ventTubeDetails");
+  tubeCaption.hidden=!tvMode||noTube||!s.tubeDetails;
+  tubeCaption.textContent=s.tubeDetails?tubeLabel(s):"";
+  document.getElementById("ventilator").classList.toggle("has-tube-caption",!tubeCaption.hidden);
   // The ventilation coach is embedded in this same tile, so do not repeat 30:2.
   prompt.hidden=!waiting;
   normalValue.hidden=noTube||waiting;
@@ -1055,11 +1059,12 @@ function renderAirwayAndRhythm(s) {
   document.getElementById("etco2Form").hidden=!s.advancedAirway;
   const tubeForm=document.getElementById("tubeDetailsForm");
   if(tubeForm){
-    tubeForm.hidden=!s.advancedAirway||!active;
+    tubeForm.hidden=!s.advancedAirway||!active||!!s.tubeDetails;
     const key=room+"|"+s.sessionId;
     if(tubeForm.dataset.session!==key){tubeForm.reset();tubeForm.dataset.session=key;}
-    const label=document.getElementById("tubeDetailsStatus");
-    label.textContent=s.tubeDetails?tubeLabel(s):"Size / depth not recorded";
+    const airway=document.getElementById("airwayAction");
+    airway.classList.toggle("split-airway",!tubeForm.hidden);
+    airway.classList.toggle("airway-placed",s.advancedAirway);
     document.getElementById("tubeDetailsSave").disabled=!connected||pendingActions.has("tubeDetails");
   }
   document.getElementById("peaWidthPicker").hidden=!(active && s.rhythm==="PEA");
@@ -2182,10 +2187,7 @@ if(!tvMode){
     const size=document.getElementById("tubeSize").valueAsNumber,depth=document.getElementById("tubeDepth").valueAsNumber;
     if(validTubeDetails({size,depth}))void handleAction("tubeDetails",{size,depth});
   });
-  document.querySelectorAll("[data-tube-step]").forEach(btn=>btn.addEventListener("click",()=>{
-    const input=document.getElementById(btn.dataset.input);
-    if(btn.dataset.tubeStep==="up")input.stepUp();else input.stepDown();
-  }));
+
   document.getElementById("causeToolsToggle").addEventListener("click",()=>{
     const s=computeState();
     if(!connected||!["running","paused"].includes(s.phase))return;
