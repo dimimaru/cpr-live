@@ -2184,3 +2184,6 @@ body.tv-mode .vent-tube-details:not([hidden]){
   font-size:clamp(9px,.8vw,13px);line-height:1.1;font-weight:650;
   color:#b5c9d8;white-space:normal;overflow-wrap:anywhere;
 }
+
+body:not(.tv-mode) .remote-main #airwayAction.airway-placed{grid-column:1/-1}
+body:not(.tv-mode) .remote-main:has(#airwayAction.airway-placed) .epi-control{grid-column:1/-1}
